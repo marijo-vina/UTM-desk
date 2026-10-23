@@ -1,0 +1,18 @@
+{
+  "name": "utm-desk-bd",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Esquema, validador, índices y semilla de la base utm_desk (MongoDB Atlas)",
+  "main": "setup_utm_desk.js",
+  "scripts": {
+    "setup": "node setup_utm_desk.js",
+    "verify": "node setup_utm_desk.js --verify-only"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mongodb": "^6.16.0"
+  }
+}
