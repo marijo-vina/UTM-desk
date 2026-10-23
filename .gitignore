@@ -4,3 +4,25 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# Archivos de materias / Unidad 1 / documentos
+ACT*
+PIU1*
+Reporte*
+RUBRICA*
+PROYECTO*
+PROY_U1*
+Proyecto2/
+UTM_Desk_BD/
+_*
+*.sql
+*.docx
+*.pdf
+*.png
+*.py
+~$*
+asdadd.docx
+diagrama_automid.png
+Roles-Avance5.sql
+Consultas-Avance4.sql
+Diagnostico-Supabase.sql
