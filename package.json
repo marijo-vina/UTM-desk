@@ -11,6 +11,7 @@
     "dev:web": "npm run dev -w @utm-desk/web",
     "test": "npm test -w @utm-desk/api",
     "db:init": "npm run init -w @utm-desk/db",
-    "db:seed": "npm run seed -w @utm-desk/db"
+    "db:seed": "npm run seed -w @utm-desk/db",
+    "db:seed:incidencias": "npm run seed:incidencias -w @utm-desk/db"
   }
 }

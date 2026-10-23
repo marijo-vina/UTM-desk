@@ -8,7 +8,8 @@
   },
   "scripts": {
     "init": "node init.mjs",
-    "seed": "node seed.mjs"
+    "seed": "node seed.mjs",
+    "seed:incidencias": "node seed-incidencias.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
