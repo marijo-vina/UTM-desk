@@ -125,3 +125,29 @@ export const loginBody = {
     contrasena: { type: 'string', minLength: 1, maxLength: 200 },
   },
 }
+
+/** Query de listado/filtros/búsqueda (RF-05, RF-06). pagina/limite llegan como string. */
+export const listadoIncidenciasQuery = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    categoria: { type: 'string', enum: ['computo_redes', 'infraestructura', 'academico'] },
+    estado: {
+      type: 'string',
+      enum: ['abierta', 'en_proceso', 'en_espera', 'resuelta', 'cerrada'],
+    },
+    edificio: { type: 'string', minLength: 1, maxLength: 80 },
+    q: { type: 'string', minLength: 1, maxLength: 200 },
+    pagina: { type: 'string', pattern: '^[1-9]\\d{0,5}$' },
+    limite: { type: 'string', pattern: '^[1-9]\\d{0,2}$' },
+  },
+}
+
+export const codigoIncidenciaParams = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['codigo'],
+  properties: {
+    codigo: { type: 'string', pattern: '^INC-\\d{8}-(CR|IN|AC)-\\d{4}$' },
+  },
+}

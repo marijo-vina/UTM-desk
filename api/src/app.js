@@ -18,6 +18,14 @@ export async function buildApp(options) {
 
   app.decorate('mongo', options.mongo)
   app.decorate('folios', options.folios)
+  app.decorate(
+    'storage',
+    options.storage ?? {
+      async firmarEvidencias(evidencias = []) {
+        return evidencias.map((evidencia) => ({ ...evidencia, url_firmada: null }))
+      },
+    },
+  )
 
   app.setErrorHandler((error, request, reply) => {
     if (error.validation || error.code === 'FST_ERR_VALIDATION') {
