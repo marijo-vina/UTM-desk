@@ -99,6 +99,41 @@ function crearMongo() {
           filas.push(doc)
           return { insertedId: new ObjectId() }
         },
+        async updateOne(filtro, update) {
+          const indice = filas.findIndex((fila) => coincideFiltro(fila, filtro))
+          if (indice === -1) return { matchedCount: 0, modifiedCount: 0 }
+          const doc = filas[indice]
+          if (update.$set) Object.assign(doc, update.$set)
+          if (update.$inc) {
+            for (const [clave, valor] of Object.entries(update.$inc)) {
+              doc[clave] = (doc[clave] ?? 0) + valor
+            }
+          }
+          if (update.$push) {
+            for (const [clave, valor] of Object.entries(update.$push)) {
+              if (!Array.isArray(doc[clave])) doc[clave] = []
+              doc[clave].push(valor)
+            }
+          }
+          if (update.$addToSet) {
+            for (const [clave, valor] of Object.entries(update.$addToSet)) {
+              if (!Array.isArray(doc[clave])) doc[clave] = []
+              if (!doc[clave].includes(valor)) doc[clave].push(valor)
+            }
+          }
+          if (update.$pull) {
+            for (const [clave, valor] of Object.entries(update.$pull)) {
+              if (!Array.isArray(doc[clave])) continue
+              doc[clave] = doc[clave].filter((item) => {
+                if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
+                  return !Object.entries(valor).every(([k, v]) => coincide(item[k], v))
+                }
+                return item !== valor
+              })
+            }
+          }
+          return { matchedCount: 1, modifiedCount: 1 }
+        },
       }
     },
   }
@@ -481,4 +516,257 @@ test('M2: listado, filtros, busqueda textual y detalle', async (t) => {
     headers: { authorization: `Bearer ${tokenSoporte}` },
   })
   assert.equal(inexistente.statusCode, 404)
+})
+
+test('M3: ciclo de vida atomico, matriz Tabla 6 y bitacora', async (t) => {
+  const { db, usuarios, incidencias } = crearMongo()
+  const hash = await bcrypt.hash('utmdesk123', 4)
+  const tecnicoId = new ObjectId()
+  const coordinadorId = new ObjectId()
+  const reportanteId = new ObjectId()
+
+  usuarios.push(
+    {
+      _id: tecnicoId,
+      correo: 'tec.jmartinez@utm.mx',
+      hash_contrasena: hash,
+      nombre: 'J. Martínez',
+      rol: 'tecnico',
+      perfil: 'administrativo',
+      activo: true,
+    },
+    {
+      _id: coordinadorId,
+      correo: 'coordinador@utm.mx',
+      hash_contrasena: hash,
+      nombre: 'Coordinación de soporte',
+      rol: 'coordinador',
+      perfil: 'administrativo',
+      activo: true,
+    },
+    {
+      _id: reportanteId,
+      correo: 'ana.lopez@utm.mx',
+      hash_contrasena: hash,
+      nombre: 'Ana López Ruiz',
+      rol: 'reportante',
+      perfil: 'docente',
+      activo: true,
+    },
+  )
+
+  const creacion = new Date('2026-10-20T15:00:00.000Z')
+  incidencias.push(
+    {
+      _id: new ObjectId(),
+      codigo: 'INC-20261020-CR-0001',
+      titulo: 'Switch inestable',
+      descripcion: 'Reinicios periodicos',
+      categoria: 'computo_redes',
+      prioridad: 'alta',
+      estado: 'abierta',
+      reportante: {
+        usuario_id: reportanteId,
+        nombre: 'Ana López Ruiz',
+        perfil: 'docente',
+        correo: 'ana.lopez@utm.mx',
+      },
+      ubicacion: { edificio: 'Edificio A', aula_o_zona: 'Lab A-101' },
+      detalle_especifico: {
+        direccion_ip: '10.20.11.2',
+        vlan: 110,
+        puerto_uplink: 'Gi0/1',
+        equipos_afectados: 24,
+      },
+      tags: ['switch'],
+      historial_seguimiento: [
+        {
+          fecha: creacion,
+          autor: 'sistema',
+          estado_resultante: 'abierta',
+          comentario: 'Incidencia registrada.',
+          horas_registradas: 0,
+        },
+      ],
+      evidencias_adjuntas: [],
+      horas_invertidas: 0,
+      fecha_creacion: creacion,
+      fecha_actualizacion: creacion,
+    },
+    {
+      _id: new ObjectId(),
+      codigo: 'INC-20261018-IN-0002',
+      titulo: 'Ticket resuelto pendiente de cierre',
+      descripcion: 'Ya se reparo',
+      categoria: 'infraestructura',
+      prioridad: 'media',
+      estado: 'resuelta',
+      reportante: {
+        usuario_id: reportanteId,
+        nombre: 'Ana López Ruiz',
+        perfil: 'docente',
+        correo: 'ana.lopez@utm.mx',
+      },
+      ubicacion: { edificio: 'Edificio B', aula_o_zona: 'Pasillo' },
+      detalle_especifico: {
+        tipo_dano: 'luminaria',
+        riesgo_seguridad: false,
+        requiere_insumos: false,
+        contratista_externo: false,
+      },
+      tags: ['luminaria'],
+      historial_seguimiento: [
+        {
+          fecha: creacion,
+          autor: 'sistema',
+          estado_resultante: 'abierta',
+          comentario: 'Incidencia registrada.',
+          horas_registradas: 0,
+        },
+      ],
+      evidencias_adjuntas: [],
+      horas_invertidas: 2,
+      fecha_creacion: creacion,
+      fecha_actualizacion: creacion,
+      fecha_resolucion: creacion,
+    },
+  )
+
+  const app = await crearApp(db, { async siguiente() {} })
+  t.after(() => app.close())
+
+  const loginTecnico = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { correo: 'tec.jmartinez@utm.mx', contrasena: 'utmdesk123' },
+  })
+  const tokenTecnico = loginTecnico.json().token
+
+  const loginCoord = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { correo: 'coordinador@utm.mx', contrasena: 'utmdesk123' },
+  })
+  const tokenCoord = loginCoord.json().token
+
+  const loginAna = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { correo: 'ana.lopez@utm.mx', contrasena: 'utmdesk123' },
+  })
+  const tokenAna = loginAna.json().token
+
+  const comoReportante = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenAna}` },
+    payload: { estado: 'en_proceso', comentario: 'Intento de avance' },
+  })
+  assert.equal(comoReportante.statusCode, 403)
+
+  const avance = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: {
+      estado: 'en_proceso',
+      comentario: 'Se inicia la atencion.',
+      horas_registradas: 1.5,
+    },
+  })
+  assert.equal(avance.statusCode, 200)
+  assert.equal(avance.json().estado, 'en_proceso')
+  assert.equal(avance.json().horas_invertidas, 1.5)
+  assert.equal(avance.json().historial_seguimiento.length, 2)
+  assert.equal(avance.json().historial_seguimiento[1].autor, 'J. Martínez')
+  assert.equal(avance.json().fecha_resolucion, null)
+
+  const regresoAbierta = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: { estado: 'abierta', comentario: 'No permitido' },
+  })
+  assert.equal(regresoAbierta.statusCode, 409)
+
+  const asignaTecnico = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: {
+      comentario: 'Intento de asignar',
+      tecnico_asignado: 'tec.jmartinez@utm.mx',
+    },
+  })
+  assert.equal(asignaTecnico.statusCode, 403)
+
+  const coordAsigna = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenCoord}` },
+    payload: {
+      comentario: 'Se asigna tecnico.',
+      tecnico_asignado: 'tec.jmartinez@utm.mx',
+    },
+  })
+  assert.equal(coordAsigna.statusCode, 200)
+  assert.equal(coordAsigna.json().tecnico_asignado, 'tec.jmartinez@utm.mx')
+  assert.equal(coordAsigna.json().estado, 'en_proceso')
+
+  const aResuelta = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: {
+      estado: 'resuelta',
+      comentario: 'Falla corregida.',
+      horas_registradas: 2,
+    },
+  })
+  assert.equal(aResuelta.statusCode, 200)
+  assert.equal(aResuelta.json().estado, 'resuelta')
+  assert.ok(aResuelta.json().fecha_resolucion)
+  assert.equal(aResuelta.json().horas_invertidas, 3.5)
+
+  const cierreTecnico = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: { estado: 'cerrada', comentario: 'Cierre no autorizado' },
+  })
+  assert.equal(cierreTecnico.statusCode, 403)
+
+  const cierreCoord = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenCoord}` },
+    payload: { estado: 'cerrada', comentario: 'Coordinacion cierra la incidencia.' },
+  })
+  assert.equal(cierreCoord.statusCode, 200)
+  assert.equal(cierreCoord.json().estado, 'cerrada')
+  assert.equal(cierreCoord.json().historial_seguimiento.length, 5)
+
+  const sobreCerrada = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261020-CR-0001',
+    headers: { authorization: `Bearer ${tokenCoord}` },
+    payload: { comentario: 'Ya no se puede' },
+  })
+  assert.equal(sobreCerrada.statusCode, 409)
+
+  const noExiste = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20990101-CR-9999',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: { estado: 'en_proceso', comentario: 'Nada' },
+  })
+  assert.equal(noExiste.statusCode, 404)
+
+  const soloHorasResuelta = await app.inject({
+    method: 'PATCH',
+    url: '/incidencias/INC-20261018-IN-0002',
+    headers: { authorization: `Bearer ${tokenTecnico}` },
+    payload: { comentario: 'Horas extra no permitidas en resuelta' },
+  })
+  assert.equal(soloHorasResuelta.statusCode, 409)
 })

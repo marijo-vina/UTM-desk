@@ -1,9 +1,10 @@
 import { ObjectId } from 'mongodb'
-import { ROLES_REGISTRAN } from '@utm-desk/db/catalogo'
+import { ROLES_REGISTRAN, ROLES_SEGUIMIENTO, TRANSICIONES } from '@utm-desk/db/catalogo'
 import {
   altaIncidenciaBody,
   codigoIncidenciaParams,
   listadoIncidenciasQuery,
+  patchIncidenciaBody,
 } from '../schemas/incidencia.js'
 import { exigirRoles, exigirSesion } from './auth.js'
 
@@ -249,6 +250,80 @@ export async function rutasIncidencias(app) {
       })
 
       return reply.code(200).send(expediente)
+    },
+  )
+
+  app.patch(
+    '/incidencias/:codigo',
+    {
+      schema: { params: codigoIncidenciaParams, body: patchIncidenciaBody },
+      preHandler: exigirRoles(...ROLES_SEGUIMIENTO),
+    },
+    async (request, reply) => {
+      const { codigo } = request.params
+      const cuerpo = request.body
+      const coleccion = app.mongo.collection('incidencias_campus')
+
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      if (cuerpo.tecnico_asignado !== undefined && request.user.rol !== 'coordinador') {
+        return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
+      }
+
+      const estadoActual = incidencia.estado
+      const estadoNuevo = cuerpo.estado ?? estadoActual
+      const permitidos = TRANSICIONES[estadoActual] ?? []
+
+      if (!permitidos.includes(estadoNuevo)) {
+        return reply.code(409).send({ error: 'Transicion de estado no permitida' })
+      }
+
+      if (estadoNuevo === 'cerrada' && request.user.rol !== 'coordinador') {
+        return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
+      }
+
+      const ahora = new Date()
+      const horas = cuerpo.horas_registradas ?? 0
+      const $set = {
+        estado: estadoNuevo,
+        fecha_actualizacion: ahora,
+      }
+
+      if (cuerpo.tecnico_asignado !== undefined) {
+        $set.tecnico_asignado = cuerpo.tecnico_asignado.trim()
+      }
+
+      if (estadoNuevo === 'resuelta' && estadoActual !== 'resuelta') {
+        $set.fecha_resolucion = ahora
+      }
+
+      const update = {
+        $set,
+        $push: {
+          historial_seguimiento: {
+            fecha: ahora,
+            autor: request.user.nombre,
+            estado_resultante: estadoNuevo,
+            comentario: cuerpo.comentario.trim(),
+            horas_registradas: horas,
+          },
+        },
+      }
+
+      if (cuerpo.horas_registradas !== undefined) {
+        update.$inc = { horas_invertidas: horas }
+      }
+
+      const resultado = await coleccion.updateOne({ codigo, estado: estadoActual }, update)
+      if (resultado.matchedCount === 0) {
+        return reply.code(409).send({ error: 'Transicion de estado no permitida' })
+      }
+
+      const actualizada = await coleccion.findOne({ codigo })
+      return reply.code(200).send(serializarIncidencia(actualizada))
     },
   )
 }

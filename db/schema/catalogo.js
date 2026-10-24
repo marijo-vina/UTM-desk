@@ -14,6 +14,23 @@ export const ROLES = ['reportante', 'tecnico', 'soporte', 'coordinador', 'direct
 
 export const ROLES_REGISTRAN = ['reportante', 'tecnico', 'soporte', 'coordinador']
 
+/** Roles que pueden actualizar estado/bitácora (Tabla 6). */
+export const ROLES_SEGUIMIENTO = ['tecnico', 'soporte', 'coordinador']
+
+/**
+ * Matriz de transiciones (Tabla 6).
+ * Misma clave = permitir solo horas/comentario sin cambiar de estado.
+ * `en_proceso` y `en_espera` no regresan a `abierta`.
+ * `cerrada` es terminal. `resuelta` solo puede pasar a `cerrada` (coordinador).
+ */
+export const TRANSICIONES = {
+  abierta: ['abierta', 'en_proceso', 'en_espera', 'resuelta'],
+  en_proceso: ['en_proceso', 'en_espera', 'resuelta'],
+  en_espera: ['en_espera', 'en_proceso', 'resuelta'],
+  resuelta: ['cerrada'],
+  cerrada: [],
+}
+
 export const PERFILES = ['docente', 'estudiante', 'administrativo']
 
 export const ZONA_HORARIA = 'America/Merida'

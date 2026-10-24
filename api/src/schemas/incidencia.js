@@ -151,3 +151,19 @@ export const codigoIncidenciaParams = {
     codigo: { type: 'string', pattern: '^INC-\\d{8}-(CR|IN|AC)-\\d{4}$' },
   },
 }
+
+/** PATCH de estado y bitácora (RF-03, RF-10). */
+export const patchIncidenciaBody = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['comentario'],
+  properties: {
+    estado: {
+      type: 'string',
+      enum: ['abierta', 'en_proceso', 'en_espera', 'resuelta', 'cerrada'],
+    },
+    comentario: { type: 'string', minLength: 1, maxLength: 2000 },
+    horas_registradas: { type: 'number', minimum: 0 },
+    tecnico_asignado: { type: 'string', minLength: 1, maxLength: 120 },
+  },
+}

@@ -6,7 +6,7 @@ Monorepo de incidencias del campus. `api`, `db` y `web` se instalan juntos desde
 
 | Carpeta | Equipo | En este corte |
 | --- | --- | --- |
-| `api/` | Backend | `POST /auth/login`, `POST/GET /incidencias`, `GET /incidencias/:codigo` |
+| `api/` | Backend | Auth, CRUD incidencias y `PATCH` de ciclo de vida/bitácora |
 | `db/` | Base de datos | Validador, índices y usuarios de prueba |
 | `web/` | Interfaz | Login y formulario de alta, listo para cambiar el diseño |
 
