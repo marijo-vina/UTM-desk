@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../auth.jsx'
-import { registrarIncidencia } from '../api.js'
+import { registrarIncidencia, subirEvidencia } from '../api.js'
 import { CATEGORIAS, EDIFICIOS, ETIQUETAS_DETALLE, PRIORIDADES, ROLES, valorDetalle } from '../format.js'
 import { Alerta, Icono, InsigniaCategoria, InsigniaPrioridad } from '../ui.jsx'
 
@@ -36,8 +36,22 @@ const INICIAL = {
 
 const PASOS = ['Categoría & Datos', 'Evidencias', 'Confirmación']
 const PATRON_TAG = /^[a-z0-9áéíóúüñ-]{2,30}$/
+const TIPOS_ARCHIVO = new Set(['image/jpeg', 'image/png', 'application/pdf'])
+const LIMITE_ARCHIVO = 5 * 1024 * 1024
+const ETIQUETA_MIME = {
+  'image/jpeg': 'JPEG',
+  'image/png': 'PNG',
+  'application/pdf': 'PDF',
+}
 const entero = (valor) => /^\d+$/.test(String(valor).trim())
 const largo = (valor) => String(valor).trim().length
+
+function pesoLegible(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 const SLA_PRIORIDAD = {
   baja: 'Atención inicial < 24 horas, resolución < 72 horas hábiles.',
@@ -141,6 +155,10 @@ export default function NuevaIncidencia() {
   const [enviando, setEnviando] = useState(false)
   const [errorApi, setErrorApi] = useState(null)
   const [creada, setCreada] = useState(null)
+  const [archivos, setArchivos] = useState([])
+  const [avisoArchivo, setAvisoArchivo] = useState('')
+  const [arrastrando, setArrastrando] = useState(false)
+  const [avisoEvidencias, setAvisoEvidencias] = useState('')
 
   const poner = (campo, valor) => {
     setF((actual) => ({ ...actual, [campo]: valor }))
@@ -173,6 +191,45 @@ export default function NuevaIncidencia() {
     setF((actual) => ({ ...actual, tags: [...actual.tags, tag] }))
   }
 
+  function agregarArchivos(lista) {
+    const entrantes = [...(lista ?? [])]
+    if (!entrantes.length) return
+    const aceptados = []
+    const rechazos = []
+    for (const file of entrantes) {
+      if (!TIPOS_ARCHIVO.has(file.type)) {
+        rechazos.push(`${file.name} no es JPEG, PNG ni PDF.`)
+        continue
+      }
+      if (file.size === 0) {
+        rechazos.push(`${file.name} está vacío.`)
+        continue
+      }
+      if (file.size > LIMITE_ARCHIVO) {
+        rechazos.push(`${file.name} supera 5 MB.`)
+        continue
+      }
+      aceptados.push({
+        id: `${file.name}:${file.size}:${file.lastModified}`,
+        file,
+        nombre: file.name,
+        tipo: file.type,
+        bytes: file.size,
+      })
+    }
+    if (aceptados.length) {
+      setArchivos((actual) => {
+        const ids = new Set(actual.map((item) => item.id))
+        return [...actual, ...aceptados.filter((item) => !ids.has(item.id))]
+      })
+    }
+    setAvisoArchivo(rechazos.join(' '))
+  }
+
+  function quitarArchivo(id) {
+    setArchivos((actual) => actual.filter((item) => item.id !== id))
+  }
+
   async function enviar() {
     if (enviando) return
     const problemas = validarPaso1(f)
@@ -185,6 +242,15 @@ export default function NuevaIncidencia() {
     setErrorApi(null)
     try {
       const res = await registrarIncidencia(cuerpoDe(f))
+      const fallos = []
+      for (const item of archivos) {
+        try {
+          await subirEvidencia(res.codigo, item.file)
+        } catch (causa) {
+          fallos.push(`${item.nombre}: ${causa.message}`)
+        }
+      }
+      setAvisoEvidencias(fallos.join(' '))
       setCreada(res)
     } catch (causa) {
       setErrorApi(causa)
@@ -199,6 +265,9 @@ export default function NuevaIncidencia() {
     setErrores({})
     setErrorApi(null)
     setCreada(null)
+    setArchivos([])
+    setAvisoArchivo('')
+    setAvisoEvidencias('')
   }
 
   if (creada) {
@@ -216,6 +285,14 @@ export default function NuevaIncidencia() {
             <p className="text-[0.68rem] font-bold tracking-widest text-brand-700 uppercase">Folio de Rastreo NoSQL</p>
             <p className="mt-1 font-mono text-2xl font-bold tracking-tight text-brand-900">{creada.codigo}</p>
           </div>
+          {avisoEvidencias && (
+            <div className="mt-6 text-left">
+              <Alerta>
+                <p className="font-semibold">La incidencia quedó registrada, pero no se pudieron adjuntar todas las evidencias.</p>
+                <p className="mt-1">{avisoEvidencias}</p>
+              </Alerta>
+            </div>
+          )}
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a href={`#/incidencias/${encodeURIComponent(creada.codigo)}`} className="boton boton-primario">
               <Icono nombre="eye" /> Ver Expediente
@@ -726,7 +803,30 @@ export default function NuevaIncidencia() {
               </p>
 
               {/* Upload Dropzone */}
-              <div className="mt-4 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-8 text-center transition hover:border-brand-400 hover:bg-brand-50/20">
+              <div
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  setArrastrando(true)
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setArrastrando(true)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  if (!e.currentTarget.contains(e.relatedTarget)) setArrastrando(false)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setArrastrando(false)
+                  agregarArchivos(e.dataTransfer.files)
+                }}
+                className={`mt-4 rounded-2xl border-2 border-dashed p-8 text-center transition ${
+                  arrastrando
+                    ? 'border-brand-500 bg-brand-50/50'
+                    : 'border-slate-300 bg-slate-50/60 hover:border-brand-400 hover:bg-brand-50/20'
+                }`}
+              >
                 <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                   <Icono nombre="clip" className="size-6" />
                 </span>
@@ -736,7 +836,17 @@ export default function NuevaIncidencia() {
                 <p className="mt-1 text-xs text-slate-400">
                   Formatos admitidos: JPEG, PNG, PDF (Máximo 5 MB por archivo)
                 </p>
-                <input type="file" className="hidden" id="evidencia-input" multiple />
+                <input
+                  type="file"
+                  className="hidden"
+                  id="evidencia-input"
+                  multiple
+                  accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"
+                  onChange={(e) => {
+                    agregarArchivos(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
                 <label
                   htmlFor="evidencia-input"
                   className="boton boton-secundario mt-4 inline-flex cursor-pointer text-xs"
@@ -744,6 +854,37 @@ export default function NuevaIncidencia() {
                   Explorar Archivos
                 </label>
               </div>
+              {archivos.length > 0 && (
+                <ul className="mt-3 grid gap-2">
+                  {archivos.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-left"
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-emerald-600">
+                          <Icono nombre="check" className="size-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-800">{item.nombre}</span>
+                          <span className="block text-xs text-slate-500">
+                            {ETIQUETA_MIME[item.tipo] ?? item.tipo} · {pesoLegible(item.bytes)} · listo para enviar
+                          </span>
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => quitarArchivo(item.id)}
+                        className="grid size-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white hover:text-red-600"
+                        aria-label={`Quitar ${item.nombre}`}
+                      >
+                        <Icono nombre="x" className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {avisoArchivo && <p className="mt-2 text-xs text-red-600">{avisoArchivo}</p>}
             </div>
 
             {/* Etiquetas */}
@@ -851,6 +992,12 @@ export default function NuevaIncidencia() {
                 <div>
                   <p className="text-slate-400">Etiquetas registradas</p>
                   <p className="mt-0.5 font-mono text-slate-700">{f.tags.join(', ') || 'Sin etiquetas'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-slate-400">Evidencias adjuntas</p>
+                  <p className="mt-0.5 font-semibold text-slate-800">
+                    {archivos.length ? archivos.map((item) => item.nombre).join(', ') : 'Sin archivos'}
+                  </p>
                 </div>
               </div>
 
