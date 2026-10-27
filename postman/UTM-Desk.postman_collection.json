@@ -1,0 +1,626 @@
+{
+  "info": {
+    "name": "UTM Desk API",
+    "description": "Banco de pruebas HTTP (RF-12). Cubre 200, 201, 400, 401, 403, 404, 409, 413 y 415.\n\nAntes de correr la colección: API en {{baseUrl}}, `npm run db:seed` y, para el alta, Redis configurado. Ajusta {{codigo}} a un folio existente (por ejemplo uno creado por el seed o por Registrar incidencia).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "correo", "value": "ana.lopez@utm.mx" },
+    { "key": "contrasena", "value": "utmdesk123" },
+    { "key": "token", "value": "" },
+    { "key": "tokenCoordinador", "value": "" },
+    { "key": "codigo", "value": "INC-20261027-CR-0001" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login OK 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });",
+                  "const cuerpo = pm.response.json();",
+                  "pm.collectionVariables.set('token', cuerpo.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{contrasena}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "RF-13. Credencial correcta: HTTP 200 y JWT con sub, nombre y rol."
+          }
+        },
+        {
+          "name": "Login credencial erronea 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401', function () { pm.response.to.have.status(401); });"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"clave-incorrecta\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "RF-13. Credencial errónea: HTTP 401 genérico, sin indicar si falló el correo o la clave."
+          }
+        },
+        {
+          "name": "Login coordinador 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('tokenCoordinador', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"coordinador@utm.mx\",\n  \"contrasena\": \"{{contrasena}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Guarda el token del coordinador para cierre, borrado de evidencia y borrado de ticket."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Incidencias",
+      "item": [
+        {
+          "name": "Alta sin token 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401', function () { pm.response.to.have.status(401); });"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Punto de acceso sin servicio\",\n  \"descripcion\": \"El identificador UTM-Lab-B no responde durante la practica.\",\n  \"categoria\": \"computo_redes\",\n  \"prioridad\": \"alta\",\n  \"ubicacion\": { \"edificio\": \"Edificio B\", \"aula_o_zona\": \"Laboratorio B-204\" },\n  \"detalle_especifico\": {\n    \"direccion_ip\": \"10.20.15.44\",\n    \"vlan\": 120,\n    \"puerto_uplink\": \"Gi0/24\",\n    \"equipos_afectados\": 18\n  }\n}"
+            },
+            "url": "{{baseUrl}}/incidencias",
+            "description": "RF-13. Token ausente: HTTP 401."
+          }
+        },
+        {
+          "name": "Alta cuerpo invalido 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400', function () { pm.response.to.have.status(400); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Cruce de categoria\",\n  \"descripcion\": \"El detalle no corresponde a infraestructura.\",\n  \"categoria\": \"infraestructura\",\n  \"prioridad\": \"alta\",\n  \"ubicacion\": { \"edificio\": \"Edificio C\", \"aula_o_zona\": \"Aula C-101\" },\n  \"detalle_especifico\": {\n    \"direccion_ip\": \"10.20.15.44\",\n    \"vlan\": 120,\n    \"puerto_uplink\": \"Gi0/24\",\n    \"equipos_afectados\": 18\n  }\n}"
+            },
+            "url": "{{baseUrl}}/incidencias",
+            "description": "RF-01 y RF-09. Detalle de otra categoría: HTTP 400."
+          }
+        },
+        {
+          "name": "Registrar incidencia 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', function () { pm.response.to.have.status(201); });",
+                  "const cuerpo = pm.response.json();",
+                  "if (cuerpo.codigo) pm.collectionVariables.set('codigo', cuerpo.codigo);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Punto de acceso sin servicio\",\n  \"descripcion\": \"El identificador UTM-Lab-B no responde durante la practica.\",\n  \"categoria\": \"computo_redes\",\n  \"prioridad\": \"alta\",\n  \"ubicacion\": { \"edificio\": \"Edificio B\", \"aula_o_zona\": \"Laboratorio B-204\" },\n  \"detalle_especifico\": {\n    \"direccion_ip\": \"10.20.15.44\",\n    \"vlan\": 120,\n    \"puerto_uplink\": \"Gi0/24\",\n    \"equipos_afectados\": 18\n  },\n  \"tags\": [\"wifi\", \"laboratorio\"]\n}"
+            },
+            "url": "{{baseUrl}}/incidencias",
+            "description": "RF-01. Alta válida: HTTP 201, estado abierta y folio INC-AAAAMMDD-CAT-NNNN. Requiere Redis."
+          }
+        },
+        {
+          "name": "Listar y filtrar 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias?categoria=computo_redes&estado=abierta&edificio=Edificio%20B&pagina=1&limite=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias"],
+              "query": [
+                { "key": "categoria", "value": "computo_redes" },
+                { "key": "estado", "value": "abierta" },
+                { "key": "edificio", "value": "Edificio B" },
+                { "key": "pagina", "value": "1" },
+                { "key": "limite", "value": "20" }
+              ]
+            },
+            "description": "RF-06. Filtros combinables. El reportante solo ve sus tickets. HTTP 200."
+          }
+        },
+        {
+          "name": "Busqueda sin coincidencias 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('arreglo vacio', function () { pm.expect(pm.response.json().items).to.eql([]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/incidencias?q=xyzsinmatch",
+            "description": "RF-05. Sin coincidencias: HTTP 200 y items vacío. Nunca 500."
+          }
+        },
+        {
+          "name": "Detalle inexistente 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', function () { pm.response.to.have.status(404); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/incidencias/INC-20990101-CR-9999",
+            "description": "RF-14. Folio inexistente: HTTP 404."
+          }
+        },
+        {
+          "name": "Detalle 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-14. Expediente completo y URLs firmadas de evidencias (1 h). HTTP 200. Un reportante que consulte un folio ajeno recibe 403."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ciclo de vida",
+      "item": [
+        {
+          "name": "Transicion prohibida 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('409', function () { pm.response.to.have.status(409); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"abierta\",\n  \"comentario\": \"Intento de regresar a abierta\"\n}"
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-03. Si el ticket ya no está abierta, volver a abierta responde HTTP 409. cerrada es terminal."
+          }
+        },
+        {
+          "name": "Avance de estado 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"en_proceso\",\n  \"comentario\": \"Se inicia la atencion.\",\n  \"horas_registradas\": 1.5,\n  \"tecnico_asignado\": \"tec.jmartinez@utm.mx\"\n}"
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-03 y RF-10. Un solo update con $set, $inc y $push. Asignar técnico y cerrar es exclusivo del coordinador. HTTP 200."
+          }
+        },
+        {
+          "name": "Reportante no actualiza 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', function () { pm.response.to.have.status(403); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"en_proceso\",\n  \"comentario\": \"Intento de avance\"\n}"
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-03. El reportante no cambia el estado: HTTP 403. Cerrar (cerrada) también es 403 si el rol no es coordinador."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Evidencias y etiquetas",
+      "item": [
+        {
+          "name": "Cargar evidencia 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', function () { pm.response.to.have.status(201); });",
+                  "const cuerpo = pm.response.json();",
+                  "if (cuerpo.url_storage) pm.collectionVariables.set('urlStorage', cuerpo.url_storage);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": "", "description": "JPEG, PNG o PDF de hasta 5 MB" }
+              ]
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
+            "description": "RF-02. El binario va a Supabase y Atlas solo guarda url_storage y metadatos. HTTP 201. Requiere Storage configurado."
+          }
+        },
+        {
+          "name": "Tipo de archivo invalido 415",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('415', function () { pm.response.to.have.status(415); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": "", "description": "Adjuntar un .txt u otro MIME distinto de jpeg, png o pdf" }
+              ]
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
+            "description": "RF-02. MIME distinto de image/jpeg, image/png o application/pdf: HTTP 415."
+          }
+        },
+        {
+          "name": "Archivo mayor a 5 MB 413",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('413', function () { pm.response.to.have.status(413); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": "", "description": "JPEG o PDF de más de 5 MB" }
+              ]
+            },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
+            "description": "RF-02. Mayor a 5 MB: HTTP 413."
+          }
+        },
+        {
+          "name": "Evidencia de folio inexistente 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', function () { pm.response.to.have.status(404); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "archivo", "type": "file", "src": "" }]
+            },
+            "url": "{{baseUrl}}/incidencias/INC-20990101-CR-9999/evidencias",
+            "description": "RF-02. La incidencia no existe: HTTP 404."
+          }
+        },
+        {
+          "name": "Agregar etiqueta 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tag\": \" WiFi \"\n}" },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/tags",
+            "description": "RF-04. Se normaliza a minúsculas y trim, y se agrega con $addToSet. HTTP 200. Una etiqueta inválida responde 400."
+          }
+        },
+        {
+          "name": "Quitar etiqueta ausente 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/tags/no-esta",
+            "description": "RF-04. Quitar una etiqueta que no está en el arreglo no es error: HTTP 200."
+          }
+        },
+        {
+          "name": "Borrar evidencia no coordinador 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', function () { pm.response.to.have.status(403); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url_storage\": \"{{urlStorage}}\"\n}" },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
+            "description": "RF-15. Solo el coordinador borra una evidencia. Otro rol: HTTP 403."
+          }
+        },
+        {
+          "name": "Borrar evidencia 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url_storage\": \"{{urlStorage}}\"\n}" },
+            "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
+            "description": "RF-15. $pull del metadato y borrado del objeto en Supabase. HTTP 200. Si la ruta no existe: 404."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analitica y borrado",
+      "item": [
+        {
+          "name": "Resolucion por edificio 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/analitica/resolucion-por-edificio",
+            "description": "RF-07. Agrupa resueltas y cerradas por edificio. horas_trabajo es la bitácora; tiempo_transcurrido es calendario. HTTP 200. Técnico y reportante: 403."
+          }
+        },
+        {
+          "name": "Etiquetas frecuentes 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/analitica/etiquetas-frecuentes",
+            "description": "RF-07. Top 10 de tags con desempate alfabético. HTTP 200."
+          }
+        },
+        {
+          "name": "Analitica como reportante 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', function () { pm.response.to.have.status(403); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/analitica/resolucion-por-edificio",
+            "description": "RF-11. La analítica está oculta al reportante y al técnico: HTTP 403."
+          }
+        },
+        {
+          "name": "Borrar ticket no coordinador 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', function () { pm.response.to.have.status(403); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-15. Un rol distinto de coordinador recibe HTTP 403."
+          }
+        },
+        {
+          "name": "Borrar ticket inexistente 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', function () { pm.response.to.have.status(404); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/incidencias/INC-20990101-CR-9999",
+            "description": "RF-15. Folio inexistente: HTTP 404."
+          }
+        },
+        {
+          "name": "Borrar ticket 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenCoordinador}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/incidencias/{{codigo}}",
+            "description": "RF-15. El coordinador elimina el documento y los archivos del bucket. HTTP 200."
+          }
+        }
+      ]
+    }
+  ]
+}

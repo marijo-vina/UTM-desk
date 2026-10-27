@@ -17,6 +17,9 @@ export const ROLES_REGISTRAN = ['reportante', 'tecnico', 'soporte', 'coordinador
 /** Roles que pueden actualizar estado/bitácora (Tabla 6). */
 export const ROLES_SEGUIMIENTO = ['tecnico', 'soporte', 'coordinador']
 
+/** Analítica oculta a técnico y reportante (RF-11). */
+export const ROLES_ANALITICA = ['soporte', 'coordinador', 'directivo']
+
 /**
  * Matriz de transiciones (Tabla 6).
  * Misma clave = permitir solo horas/comentario sin cambiar de estado.
