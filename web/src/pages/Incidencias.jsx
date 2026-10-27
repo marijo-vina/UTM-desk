@@ -64,19 +64,16 @@ export default function Incidencias() {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/80 px-3 py-1 font-semibold text-blue-700">
               <span className="size-2 rounded-full bg-blue-500" />
-              Abiertas:{' '}
-              {carga.datos.items.filter((i) => i.estado === 'abierta').length || (esReportante ? 1 : 5)}
+              Abiertas: {carga.datos.items.filter((i) => i.estado === 'abierta').length}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 font-semibold text-amber-700">
               <span className="size-2 rounded-full bg-amber-500" />
               En proceso:{' '}
-              {carga.datos.items.filter((i) => i.estado === 'en_proceso' || i.estado === 'en_espera').length || 1}
+              {carga.datos.items.filter((i) => i.estado === 'en_proceso' || i.estado === 'en_espera').length}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1 font-semibold text-emerald-700">
               <span className="size-2 rounded-full bg-emerald-500" />
-              Resueltas:{' '}
-              {carga.datos.items.filter((i) => i.estado === 'resuelta' || i.estado === 'cerrada').length ||
-                (esReportante ? 4 : 18)}
+              Resueltas: {carga.datos.items.filter((i) => i.estado === 'resuelta' || i.estado === 'cerrada').length}
             </span>
           </div>
         )}

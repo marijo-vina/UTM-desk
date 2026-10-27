@@ -1,11 +1,4 @@
-import {
-  ANALITICA_ETIQUETAS_SEMILLA,
-  ANALITICA_POR_EDIFICIO_SEMILLA,
-  INCIDENCIAS_SEMILLA,
-} from './catalogo_datos.js'
-
 const CLAVE = 'utm-desk-sesion'
-const CLAVE_LOCAL_INCIDENCIAS = 'utm-desk-incidencias-locales'
 
 let alExpirar = () => {}
 
@@ -128,63 +121,14 @@ export async function iniciarSesion(correo, contrasena) {
   }
 }
 
-/** Almacén local de incidencias registradas en la sesión actual */
-function leerIncidenciasLocales() {
-  try {
-    const crudo = sessionStorage.getItem(CLAVE_LOCAL_INCIDENCIAS)
-    return crudo ? JSON.parse(crudo) : []
-  } catch {
-    return []
-  }
-}
-
-function guardarIncidenciaLocal(incidencia) {
-  try {
-    const lista = leerIncidenciasLocales()
-    lista.unshift(incidencia)
-    sessionStorage.setItem(CLAVE_LOCAL_INCIDENCIAS, JSON.stringify(lista))
-  } catch {
-    /* ignore */
-  }
-}
-
 export async function registrarIncidencia(incidencia) {
-  const respuesta = await pedir('/incidencias', { metodo: 'POST', cuerpo: incidencia })
-  // Cachear para visualización inmediata
-  guardarIncidenciaLocal({
-    ...incidencia,
-    codigo: respuesta.codigo,
-    estado: respuesta.estado ?? 'abierta',
-    fecha_creacion: respuesta.fecha_creacion ?? new Date().toISOString(),
-    fecha_actualizacion: new Date().toISOString(),
-    historial_seguimiento: [
-      {
-        fecha: new Date().toISOString(),
-        autor: 'sistema',
-        estado_resultante: 'abierta',
-        comentario: 'Incidencia registrada en portal.',
-        horas_registradas: 0,
-      },
-    ],
-    evidencias_adjuntas: [],
-  })
-  return respuesta
+  return pedir('/incidencias', { metodo: 'POST', cuerpo: incidencia })
 }
 
 const rutaIncidencia = (codigo) => `/incidencias/${encodeURIComponent(codigo)}`
 
 export async function obtenerIncidencia(codigo) {
-  try {
-    return await pedir(rutaIncidencia(codigo))
-  } catch (error) {
-    if (error.noDisponible) {
-      const locales = leerIncidenciasLocales()
-      const todas = [...locales, ...INCIDENCIAS_SEMILLA]
-      const encontrada = todas.find((item) => item.codigo === codigo)
-      if (encontrada) return encontrada
-    }
-    throw error
-  }
+  return pedir(rutaIncidencia(codigo))
 }
 
 export const actualizarIncidencia = (codigo, cambios) =>
@@ -198,29 +142,15 @@ export const agregarTag = (codigo, tag) =>
 export const quitarTag = (codigo, tag) =>
   pedir(`${rutaIncidencia(codigo)}/tags/${encodeURIComponent(tag)}`, { metodo: 'DELETE' })
 
-export async function analiticaPorEdificio() {
-  try {
-    return await pedir('/analitica/resolucion-por-edificio')
-  } catch (error) {
-    if (error.noDisponible) {
-      return ANALITICA_POR_EDIFICIO_SEMILLA
-    }
-    throw error
-  }
+export function analiticaPorEdificio() {
+  return pedir('/analitica/resolucion-por-edificio')
 }
 
-export async function analiticaEtiquetas() {
-  try {
-    return await pedir('/analitica/etiquetas-frecuentes')
-  } catch (error) {
-    if (error.noDisponible) {
-      return ANALITICA_ETIQUETAS_SEMILLA
-    }
-    throw error
-  }
+export function analiticaEtiquetas() {
+  return pedir('/analitica/etiquetas-frecuentes')
 }
 
-/** GET /incidencias?categoria&estado&edificio&q&page&limit */
+/** GET /incidencias?categoria&estado&edificio&q&pagina&limite */
 export async function listarIncidencias({
   q = '',
   categoria = '',
@@ -229,50 +159,23 @@ export async function listarIncidencias({
   page = 1,
   limit = 10,
 } = {}) {
-  try {
-    const datos = await pedir('/incidencias', {
-      consulta: { q, categoria, estado, edificio, page, limit },
-    })
-    const items = Array.isArray(datos) ? datos : datos?.items ?? datos?.incidencias ?? datos?.data ?? []
-    const total = Number.isFinite(datos?.total) ? datos.total : items.length
-    const paginas = Number.isFinite(datos?.paginas)
-      ? datos.paginas
-      : Number.isFinite(datos?.pages)
+  const pagina = Math.max(1, Number(page) || 1)
+  const limite = Math.max(1, Number(limit) || 10)
+  const datos = await pedir('/incidencias', {
+    consulta: { q, categoria, estado, edificio, pagina, limite },
+  })
+  const items = Array.isArray(datos) ? datos : datos?.items ?? datos?.incidencias ?? datos?.data ?? []
+  const total = Number.isFinite(datos?.total) ? datos.total : items.length
+  const paginas = Number.isFinite(datos?.paginas)
+    ? datos.paginas
+    : Number.isFinite(datos?.pages)
       ? datos.pages
-      : Math.max(1, Math.ceil(total / limit))
-    return { items, total, pagina: page, paginas, limite: limit }
-  } catch (error) {
-    if (error.noDisponible) {
-      // Fallback enriquecido: combina nuevas creadas con las semillas oficiales
-      const locales = leerIncidenciasLocales()
-      let todas = [...locales, ...INCIDENCIAS_SEMILLA]
-
-      if (q) {
-        const busqueda = q.toLowerCase()
-        todas = todas.filter(
-          (i) =>
-            i.codigo.toLowerCase().includes(busqueda) ||
-            i.titulo.toLowerCase().includes(busqueda) ||
-            i.descripcion?.toLowerCase().includes(busqueda),
-        )
-      }
-      if (categoria) {
-        todas = todas.filter((i) => i.categoria === categoria)
-      }
-      if (estado) {
-        todas = todas.filter((i) => i.estado === estado)
-      }
-      if (edificio) {
-        todas = todas.filter((i) => i.ubicacion?.edificio === edificio)
-      }
-
-      const total = todas.length
-      const inicio = (page - 1) * limit
-      const items = todas.slice(inicio, inicio + limit)
-      const paginas = Math.max(1, Math.ceil(total / limit))
-
-      return { items, total, pagina: page, paginas, limite: limit }
-    }
-    throw error
+      : Math.max(1, Math.ceil(total / limite))
+  return {
+    items,
+    total,
+    pagina: Number.isFinite(datos?.pagina) ? datos.pagina : pagina,
+    paginas,
+    limite: Number.isFinite(datos?.limite) ? datos.limite : limite,
   }
 }

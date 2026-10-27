@@ -1,8 +1,6 @@
-import { useState } from 'react'
-import { analiticaEtiquetas, analiticaPorEdificio } from '../api.js'
-import { horas } from '../format.js'
+import { analiticaEtiquetas, analiticaPorEdificio, listarIncidencias } from '../api.js'
 import { useCarga } from '../hooks.js'
-import { Cargable, Esqueleto, Icono, Vacio } from '../ui.jsx'
+import { Cargable, Esqueleto, Icono } from '../ui.jsx'
 
 const numero = (valor) => (typeof valor === 'number' && Number.isFinite(valor) ? valor : null)
 const lista = (datos) =>
@@ -19,9 +17,9 @@ function leerEdificio(fila) {
   }
   return {
     edificio: String(fila.edificio ?? fila._id ?? fila.nombre ?? 'Sin edificio'),
-    conteo: numero(fila.conteo ?? fila.total ?? fila.count ?? fila.incidencias) ?? 0,
+    conteo: numero(fila.conteo ?? fila.casos ?? fila.total ?? fila.count ?? fila.incidencias) ?? 0,
     tiempo,
-    trabajo: numero(fila.horas_invertidas ?? fila.total_horas_invertidas ?? fila.suma_horas_invertidas) ?? 0,
+    trabajo: numero(fila.horas_trabajo ?? fila.horas_invertidas ?? fila.total_horas_invertidas ?? fila.suma_horas_invertidas) ?? 0,
   }
 }
 
@@ -32,19 +30,32 @@ function leerEtiqueta(fila) {
   }
 }
 
+const CATEGORIAS_GRAFICA = [
+  { id: 'computo_redes', nombre: 'Cómputo y Telecomunicaciones', color: '#2563eb', barra: 'bg-brand-600', texto: 'text-brand-600' },
+  { id: 'infraestructura', nombre: 'Infraestructura Física', color: '#0d9488', barra: 'bg-teal-500', texto: 'text-teal-600' },
+  { id: 'academico', nombre: 'Sistemas Académicos', color: '#f97316', barra: 'bg-orange-500', texto: 'text-orange-600' },
+]
+
 async function cargar() {
-  const [porEdificio, etiquetas] = await Promise.all([analiticaPorEdificio(), analiticaEtiquetas()])
+  const [porEdificio, etiquetas, ...conteos] = await Promise.all([
+    analiticaPorEdificio(),
+    analiticaEtiquetas(),
+    ...CATEGORIAS_GRAFICA.map((categoria) => listarIncidencias({ categoria: categoria.id, limit: 1 })),
+  ])
   return {
     edificios: lista(porEdificio).map(leerEdificio),
     etiquetas: lista(etiquetas)
       .map(leerEtiqueta)
       .filter((fila) => fila.etiqueta),
+    categorias: CATEGORIAS_GRAFICA.map((categoria, indice) => ({
+      ...categoria,
+      total: conteos[indice]?.total ?? 0,
+    })),
   }
 }
 
 export default function Analitica() {
   const carga = useCarga(cargar, [])
-  const [rango, setRango] = useState('2026-1')
 
   return (
     <div className="grid gap-6 animate-aparece">
@@ -66,15 +77,6 @@ export default function Analitica() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
-            value={rango}
-            onChange={(e) => setRango(e.target.value)}
-            className="campo text-xs py-1.5 font-medium"
-          >
-            <option value="2026-1">Rango analítico: Semestre Académico 2026-1</option>
-            <option value="2025-2">Rango analítico: Semestre Académico 2025-2</option>
-            <option value="30d">Últimos 30 días</option>
-          </select>
           <button
             type="button"
             onClick={() => window.print()}
@@ -120,42 +122,22 @@ export default function Analitica() {
         }
       >
         {(datos) => {
-          const { edificios, etiquetas } = datos
-          const resueltas = edificios.reduce((suma, fila) => suma + fila.conteo, 0) || 52
+          const { edificios, etiquetas, categorias } = datos
+          const resueltas = edificios.reduce((suma, fila) => suma + fila.conteo, 0)
           const conTiempo = edificios.filter((fila) => fila.tiempo !== null && fila.conteo > 0)
           const ponderado = conTiempo.reduce((suma, fila) => suma + fila.conteo, 0)
           const tiempoGlobal = ponderado
             ? conTiempo.reduce((suma, fila) => suma + fila.tiempo * fila.conteo, 0) / ponderado
-            : 4.4
-          const trabajo = edificios.reduce((suma, fila) => suma + fila.trabajo, 0) || 229
-
-          // Datos base enriquecidos si no hay suficientes datos en la BD
-          const edificiosVisuales = edificios.length
-            ? edificios
-            : [
-                { edificio: 'Edificio A', conteo: 12, tiempo: 4.1, trabajo: 38 },
-                { edificio: 'Edificio B', conteo: 14, tiempo: 4.8, trabajo: 65 },
-                { edificio: 'Edificio C', conteo: 11, tiempo: 5.2, trabajo: 58 },
-                { edificio: 'Edificio D', conteo: 8, tiempo: 2.1, trabajo: 26 },
-                { edificio: 'Edificio E', conteo: 7, tiempo: 3.5, trabajo: 42 },
-              ]
-
-          const etiquetasVisuales = etiquetas.length
-            ? etiquetas
-            : [
-                { etiqueta: 'wifi', total: 31 },
-                { etiqueta: 'red-inalámbrica', total: 28 },
-                { etiqueta: 'filtracion', total: 19 },
-                { etiqueta: 'gotera', total: 16 },
-                { etiqueta: 'portal-académico', total: 15 },
-                { etiqueta: 'laboratorio', total: 14 },
-                { etiqueta: 'riesgo-electrico', total: 12 },
-                { etiqueta: 'servidor', total: 11 },
-                { etiqueta: 'apagador', total: 10 },
-                { etiqueta: 'switch-poe', total: 8 },
-              ]
-
-          const maxEtiquetas = Math.max(...etiquetasVisuales.map((e) => e.total), 1)
+            : null
+          const trabajo = edificios.reduce((suma, fila) => suma + fila.trabajo, 0)
+          const agil = conTiempo.slice().sort((a, b) => a.tiempo - b.tiempo)[0]
+          const lider = edificios.slice().sort((a, b) => b.trabajo - a.trabajo)[0]
+          const totalCategorias = categorias.reduce((suma, fila) => suma + fila.total, 0)
+          const dominante = categorias.slice().sort((a, b) => b.total - a.total)[0]
+          const maxEtiquetas = Math.max(...etiquetas.map((item) => item.total), 1)
+          const maxTiempo = Math.max(...edificios.map((item) => item.tiempo ?? 0), 1)
+          const maxTrabajo = Math.max(...edificios.map((item) => item.trabajo), 1)
+          let desplazamiento = 0
 
           return (
             <div className="grid gap-6">
@@ -169,7 +151,7 @@ export default function Analitica() {
                   <div className="mt-2.5 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-slate-900">{resueltas}</span>
                   </div>
-                  <p className="mt-1 text-[0.68rem] text-slate-400">100% de tickets asignados</p>
+                  <p className="mt-1 text-[0.68rem] text-slate-400">Resueltas y cerradas por edificio</p>
                 </div>
 
                 <div className="tarjeta p-4 sm:p-5">
@@ -182,7 +164,7 @@ export default function Analitica() {
                   <div className="mt-2.5 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-slate-900">{trabajo} hrs</span>
                   </div>
-                  <p className="mt-1 text-[0.68rem] text-slate-400">Estimadas en 5 edificios clave</p>
+                  <p className="mt-1 text-[0.68rem] text-slate-400">Suma de horas registradas en la bitácora</p>
                 </div>
 
                 <div className="tarjeta p-4 sm:p-5">
@@ -192,10 +174,10 @@ export default function Analitica() {
                   </div>
                   <div className="mt-2.5 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-slate-900">
-                      {Math.round(tiempoGlobal * 10) / 10} hrs
+                      {tiempoGlobal === null ? '—' : `${Math.round(tiempoGlobal * 10) / 10} hrs`}
                     </span>
                   </div>
-                  <p className="mt-1 text-[0.68rem] text-emerald-600 font-semibold">SLA general dentro de umbral</p>
+                  <p className="mt-1 text-[0.68rem] text-slate-400">Calendario entre creación y resolución</p>
                 </div>
 
                 <div className="tarjeta p-4 sm:p-5">
@@ -204,9 +186,11 @@ export default function Analitica() {
                     <Icono nombre="building" className="size-4 text-emerald-600" />
                   </div>
                   <div className="mt-2.5 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-slate-900">Edificio D</span>
+                    <span className="text-3xl font-extrabold text-slate-900">{agil?.edificio ?? '—'}</span>
                   </div>
-                  <p className="mt-1 text-[0.68rem] text-slate-400">2.1 hrs promedio en tales jornadas</p>
+                  <p className="mt-1 text-[0.68rem] text-slate-400">
+                    {agil ? `${Math.round(agil.tiempo * 10) / 10} hrs de calendario` : 'Sin tickets resueltos'}
+                  </p>
                 </div>
               </div>
 
@@ -236,9 +220,11 @@ export default function Analitica() {
                     </div>
 
                     <div className="h-48 flex items-end justify-between gap-4 pt-6 px-2">
-                      {edificiosVisuales.map((ed) => {
-                        const hTiempo = Math.min(Math.round(((ed.tiempo || 3) / 6) * 140), 140)
-                        const hTrabajo = Math.min(Math.round(((ed.trabajo || 30) / 70) * 140), 140)
+                      {edificios.length === 0 ? (
+                        <p className="text-sm text-slate-500">No hay tickets resueltos o cerrados para graficar.</p>
+                      ) : edificios.map((ed) => {
+                        const hTiempo = Math.min(Math.round(((ed.tiempo ?? 0) / maxTiempo) * 140), 140)
+                        const hTrabajo = Math.min(Math.round((ed.trabajo / maxTrabajo) * 140), 140)
                         return (
                           <div key={ed.edificio} className="flex-1 flex flex-col items-center gap-1.5">
                             <div className="w-full flex items-end justify-center gap-1.5 h-36">
@@ -271,53 +257,35 @@ export default function Analitica() {
                           <th className="pb-2.5 text-center font-bold">TTR Medio</th>
                           <th className="pb-2.5 text-center font-bold">Horas Totales</th>
                           <th className="pb-2.5 text-center font-bold">Tickets Resueltos</th>
-                          <th className="pb-2.5 text-right font-bold">Éxito en el SLA</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {edificiosVisuales.map((ed) => {
-                          const slas = {
-                            'Edificio A': { nivel: 'Alto (94%)', color: 'text-emerald-700 bg-emerald-50' },
-                            'Edificio B': { nivel: 'Medio (88%)', color: 'text-blue-700 bg-blue-50' },
-                            'Edificio C': { nivel: 'Atención (82%)', color: 'text-amber-700 bg-amber-50' },
-                            'Edificio D': { nivel: 'Óptimo (98%)', color: 'text-emerald-700 bg-emerald-50' },
-                            'Edificio E': { nivel: 'Bueno (91%)', color: 'text-teal-700 bg-teal-50' },
-                          }
-                          const infoSla = slas[ed.edificio] ?? {
-                            nivel: 'Bueno (90%)',
-                            color: 'text-teal-700 bg-teal-50',
-                          }
-                          return (
+                        {edificios.map((ed) => (
                             <tr key={ed.edificio} className="hover:bg-slate-50/70">
                               <td className="py-2.5 font-bold text-slate-800">{ed.edificio}</td>
-                              <td className="py-2.5 text-center text-slate-600">{ed.tiempo || 3.5} hrs</td>
+                              <td className="py-2.5 text-center text-slate-600">
+                                {ed.tiempo === null ? '—' : `${Math.round(ed.tiempo * 10) / 10} hrs`}
+                              </td>
                               <td className="py-2.5 text-center text-slate-600">{ed.trabajo} hrs</td>
                               <td className="py-2.5 text-center font-semibold text-slate-800">{ed.conteo}</td>
-                              <td className="py-2.5 text-right">
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${infoSla.color}`}
-                                >
-                                  {infoSla.nivel}
-                                </span>
-                              </td>
                             </tr>
-                          )
-                        })}
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Callout Edificio C */}
+                {lider && trabajo > 0 && (
                 <div className="mt-5 rounded-xl border border-brand-100 bg-brand-50/40 px-4 py-2.5 text-xs text-brand-900 flex items-center justify-between">
                   <span>
-                    ℹ <strong>Edificio C</strong> concentró el <strong>41.7%</strong> de las horas totales debido a
-                    averías de mantenimiento de servidores críticos y cableado troncal.
+                    <strong>{lider.edificio}</strong> concentra el{' '}
+                    <strong>{Math.round((lider.trabajo / trabajo) * 1000) / 10}%</strong> de las horas de trabajo registradas.
                   </span>
                   <a href="#/incidencias" className="font-semibold text-brand-700 hover:underline shrink-0">
                     Ver detalle técnico &rarr;
                   </a>
                 </div>
+                )}
               </div>
 
               {/* Sección Inferior: Categorías Oficiales + Ranking de Fallas */}
@@ -335,93 +303,57 @@ export default function Analitica() {
                       Distribución bipartita institucional de tickets registrados.
                     </p>
 
-                    {/* Donut Chart Representativo */}
                     <div className="my-6 flex flex-col items-center justify-center">
                       <div className="relative size-36">
                         <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                          {/* Segmento 1: 52% Cómputo (Brand) */}
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="15.9155"
-                            fill="none"
-                            stroke="#2563eb"
-                            strokeWidth="3.8"
-                            strokeDasharray="52 48"
-                            strokeDashoffset="0"
-                          />
-                          {/* Segmento 2: 31% Infraestructura (Teal) */}
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="15.9155"
-                            fill="none"
-                            stroke="#0d9488"
-                            strokeWidth="3.8"
-                            strokeDasharray="31 69"
-                            strokeDashoffset="-52"
-                          />
-                          {/* Segmento 3: 17% Sistemas (Orange) */}
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="15.9155"
-                            fill="none"
-                            stroke="#f97316"
-                            strokeWidth="3.8"
-                            strokeDasharray="17 83"
-                            strokeDashoffset="-83"
-                          />
+                          {categorias.map((categoria) => {
+                            const pct = totalCategorias ? (categoria.total / totalCategorias) * 100 : 0
+                            const segmento = (
+                              <circle
+                                key={categoria.id}
+                                cx="18"
+                                cy="18"
+                                r="15.9155"
+                                fill="none"
+                                stroke={categoria.color}
+                                strokeWidth="3.8"
+                                strokeDasharray={`${pct} ${100 - pct}`}
+                                strokeDashoffset={-desplazamiento}
+                              />
+                            )
+                            desplazamiento += pct
+                            return segmento
+                          })}
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                           <span className="text-[0.62rem] font-bold text-slate-400 uppercase">DOMINANTE</span>
-                          <span className="text-sm font-extrabold text-slate-900">52%</span>
-                          <span className="text-[0.6rem] text-brand-600 font-semibold">Cómputo</span>
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {totalCategorias ? `${Math.round((dominante.total / totalCategorias) * 100)}%` : '—'}
+                          </span>
+                          <span className="text-[0.6rem] text-brand-600 font-semibold">
+                            {totalCategorias ? dominante.nombre : 'Sin datos'}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Barras de Desglose */}
                     <div className="space-y-3 text-xs">
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Cómputo y Telecomunicaciones</span>
-                          <span className="text-brand-600 font-bold">52%</span>
-                        </div>
-                        <p className="text-[0.65rem] text-slate-400">Switches, routers, estaciones de trabajo</p>
-                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-brand-600" style={{ width: '52%' }} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Infraestructura Física</span>
-                          <span className="text-teal-600 font-bold">31%</span>
-                        </div>
-                        <p className="text-[0.65rem] text-slate-400">Climatización, luminarias, obra civil</p>
-                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-teal-500" style={{ width: '31%' }} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Sistemas Académicos</span>
-                          <span className="text-orange-600 font-bold">17%</span>
-                        </div>
-                        <p className="text-[0.65rem] text-slate-400">Portales de notas, actas, trámites</p>
-                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-orange-500" style={{ width: '17%' }} />
-                        </div>
-                      </div>
+                      {categorias.map((categoria) => {
+                        const pct = totalCategorias ? Math.round((categoria.total / totalCategorias) * 100) : 0
+                        return (
+                          <div key={categoria.id}>
+                            <div className="flex justify-between font-semibold text-slate-700">
+                              <span>{categoria.nombre}</span>
+                              <span className={`${categoria.texto} font-bold`}>{pct}%</span>
+                            </div>
+                            <p className="text-[0.65rem] text-slate-400">{categoria.total} tickets</p>
+                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div className={`h-full rounded-full ${categoria.barra}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  </div>
-
-                  <div className="mt-6 border-t border-slate-100 pt-3 text-right">
-                    <span className="text-xs font-bold text-emerald-700">
-                      ✓ SLA de Respuesta Global: 89.4% Cumplido
-                    </span>
                   </div>
                 </div>
 
@@ -439,7 +371,7 @@ export default function Analitica() {
                     </p>
 
                     <div className="mt-4 space-y-2.5">
-                      {etiquetasVisuales.slice(0, 10).map((item, index) => {
+                      {etiquetas.slice(0, 10).map((item, index) => {
                         const pct = Math.max(Math.round((item.total / maxEtiquetas) * 100), 5)
                         const numeroIndice = String(index + 1).padStart(2, '0')
                         const colores = [

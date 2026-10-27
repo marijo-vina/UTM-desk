@@ -159,6 +159,7 @@ try {
     if (!cuentas.has(correo)) throw new Error(`Falta la cuenta ${correo}. Corre npm run db:seed primero.`)
   }
   const incidencias = db.collection('incidencias_campus')
+  await incidencias.deleteMany({})
   for (const fila of TICKETS) {
     const doc = documento(fila, cuentas)
     await incidencias.replaceOne({ codigo: doc.codigo }, doc, { upsert: true })

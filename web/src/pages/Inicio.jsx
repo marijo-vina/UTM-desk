@@ -36,7 +36,24 @@ export default function Inicio() {
           </div>
         }
       >
-        {(datos) => (
+        {(datos) => {
+          const criticos = datos.recientes.filter((item) => item.prioridad === 'critica')
+          const asignados = datos.recientes.filter(
+            (item) => item.tecnico_asignado && item.tecnico_asignado === usuario.correo,
+          )
+          const bandeja =
+            tabBandeja === 'criticos' ? criticos : tabBandeja === 'asignados' ? asignados : datos.recientes
+          const zonas = Object.entries(
+            datos.recientes.reduce((acc, item) => {
+              const edificio = item.ubicacion?.edificio || 'Sin edificio'
+              acc[edificio] = (acc[edificio] ?? 0) + 1
+              return acc
+            }, {}),
+          )
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+          const maxZona = zonas[0]?.[1] || 1
+          return (
           <>
             {esReportante ? (
               /* ============================================================ */
@@ -84,7 +101,7 @@ export default function Inicio() {
                       <Icono nombre="list" className="size-4 text-brand-500" />
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-slate-900">{datos.total || 6}</span>
+                      <span className="text-3xl font-extrabold text-slate-900">{datos.total ?? 0}</span>
                       <span className="text-[0.7rem] text-slate-400">histórico</span>
                     </div>
                     <div className="mt-2 flex items-center gap-1.5 text-[0.68rem] text-emerald-600">
@@ -102,7 +119,7 @@ export default function Inicio() {
                       </span>
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.abierta ?? 1}</span>
+                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.abierta ?? 0}</span>
                       <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[0.68rem] font-bold text-blue-600">
                         Abierta
                       </span>
@@ -119,7 +136,7 @@ export default function Inicio() {
                       </span>
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.en_proceso ?? 1}</span>
+                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.en_proceso ?? 0}</span>
                       <span className="rounded-md bg-teal-500/10 px-2 py-0.5 text-[0.68rem] font-bold text-teal-600">
                         En proceso
                       </span>
@@ -137,13 +154,13 @@ export default function Inicio() {
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-2">
                       <span className="text-3xl font-extrabold text-slate-900">
-                        {(datos.por_estado.resuelta ?? 0) + (datos.por_estado.cerrada ?? 0) || 4}
+                        {(datos.por_estado.resuelta ?? 0) + (datos.por_estado.cerrada ?? 0)}
                       </span>
                       <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[0.68rem] font-bold text-emerald-600">
                         Resuelta
                       </span>
                     </div>
-                    <p className="mt-2 text-[0.68rem] text-emerald-600 font-medium">100% concluidas con éxito</p>
+                    <p className="mt-2 text-[0.68rem] text-emerald-600 font-medium">Resueltas y cerradas</p>
                   </div>
                 </div>
 
@@ -214,42 +231,6 @@ export default function Inicio() {
                         </div>
                       </div>
                     ))}
-
-                    {/* Banner de Satisfacción */}
-                    <div className="flex items-center justify-between rounded-xl border border-amber-200/80 bg-amber-50/60 px-4 py-3 text-xs text-amber-900">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-amber-500 font-bold">★</span>
-                        <span>
-                          Tasa de satisfacción institucional en resoluciones pasadas es del{' '}
-                          <strong>100%</strong>. Las incidencias resueltas han sido concluidas satisfactoriamente.
-                        </span>
-                      </div>
-                      <a href="#/incidencias" className="font-semibold text-amber-800 hover:underline shrink-0">
-                        Consultar cerradas
-                      </a>
-                    </div>
-
-                    {/* Tarjeta de Anuncio de Mantenimiento con foto de Campus */}
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
-                      <div className="relative h-44 w-full overflow-hidden bg-slate-100">
-                        <img
-                          src="/campus_edificios.jpg"
-                          alt="Campus UTM Edificios"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                        <div className="absolute bottom-3 left-4 text-white">
-                          <span className="rounded bg-brand-600/90 px-2 py-0.5 text-[0.62rem] font-bold tracking-wider uppercase">
-                            Infraestructura y Red UTM
-                          </span>
-                          <h4 className="mt-1 text-sm font-bold">Mantenimiento preventivo en Edificio B y C</h4>
-                        </div>
-                      </div>
-                      <div className="p-4 text-xs leading-relaxed text-slate-600">
-                        Se realizan pruebas de enlaces de fibra óptica y remozamiento perimetral durante este fin de
-                        semana. No afectará el sistema de reinscripción académica ni la conectividad del auditorio.
-                      </div>
-                    </div>
                   </div>
 
                   {/* Columna Derecha (Acceso directo + Mesa de Ayuda TI + Técnico en turno) */}
@@ -275,17 +256,6 @@ export default function Inicio() {
                           </div>
                           <Icono nombre="right" className="size-3.5 text-slate-400" />
                         </a>
-                        <div className="py-2.5">
-                          <p className="text-xs font-semibold text-slate-700">Tiempos de Respuesta</p>
-                          <p className="text-[0.68rem] text-slate-400 mt-0.5">Promedio: 2.4 hrs de atención</p>
-                          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-emerald-500" style={{ width: '88.2%' }} />
-                          </div>
-                          <div className="mt-1 flex justify-between text-[0.62rem] text-slate-400">
-                            <span>88.2% dentro de SLA</span>
-                            <span>Meta: &gt;85%</span>
-                          </div>
-                        </div>
                       </div>
                     </div>
 
@@ -330,32 +300,6 @@ export default function Inicio() {
                       >
                         Contactar Soporte Urgente
                       </button>
-                    </div>
-
-                    {/* Técnico en turno */}
-                    <div className="tarjeta p-4">
-                      <p className="text-[0.65rem] font-bold tracking-wider text-slate-400 uppercase">
-                        Técnico en turno Edificio B y C
-                      </p>
-                      <div className="mt-3 flex items-center gap-3">
-                        <img
-                          src="/tecnico_javier.jpg"
-                          alt="Técnico Javier Martínez"
-                          className="size-11 rounded-full object-cover ring-2 ring-brand-500/30"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold text-slate-900">Ing. Javier Martínez</p>
-                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[0.6rem] font-bold text-emerald-700">
-                              EN GUARDIA
-                            </span>
-                          </div>
-                          <p className="text-[0.68rem] text-slate-500">Respuesta promedio en sitio: 12 min</p>
-                          <p className="mt-0.5 text-[0.62rem] font-semibold text-brand-600">
-                            UBICACIÓN: CC-102 (CENTRO DE CÓMPUTO)
-                          </p>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -413,10 +357,7 @@ export default function Inicio() {
                       <Icono nombre="list" className="size-4 text-brand-500" />
                     </div>
                     <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-slate-900">{datos.total || 28}</span>
-                      <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[0.62rem] font-bold text-brand-700">
-                        +12 hoy
-                      </span>
+                      <span className="text-3xl font-extrabold text-slate-900">{datos.total ?? 0}</span>
                     </div>
                   </div>
 
@@ -427,7 +368,7 @@ export default function Inicio() {
                       <Icono nombre="alert" className="size-4 text-blue-500" />
                     </div>
                     <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.abierta ?? 5}</span>
+                      <span className="text-3xl font-extrabold text-slate-900">{datos.por_estado.abierta ?? 0}</span>
                       <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[0.62rem] font-bold text-blue-700">
                         en triage
                       </span>
@@ -437,11 +378,11 @@ export default function Inicio() {
                   {/* Críticas (Red Card) */}
                   <div className="tarjeta border-red-200 bg-red-50/40 p-4">
                     <div className="flex items-center justify-between text-red-700">
-                      <span className="text-[0.65rem] font-bold tracking-wider uppercase">Incidencias Críticas</span>
+                      <span className="text-[0.65rem] font-bold tracking-wider uppercase">En espera</span>
                       <span className="size-2 rounded-full bg-red-500 animate-pulse" />
                     </div>
                     <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-red-700">2</span>
+                      <span className="text-3xl font-extrabold text-red-700">{datos.por_estado.en_espera ?? 0}</span>
                       <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-bold text-red-800">
                         SLA &lt; 2h
                       </span>
@@ -451,11 +392,11 @@ export default function Inicio() {
                   {/* Sin Técnico (Yellow Card) */}
                   <div className="tarjeta border-amber-200 bg-amber-50/40 p-4">
                     <div className="flex items-center justify-between text-amber-700">
-                      <span className="text-[0.65rem] font-bold tracking-wider uppercase">Sin Técnico Asignado</span>
+                      <span className="text-[0.65rem] font-bold tracking-wider uppercase">En proceso</span>
                       <Icono nombre="user" className="size-4 text-amber-600" />
                     </div>
                     <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-amber-700">3</span>
+                      <span className="text-3xl font-extrabold text-amber-700">{datos.por_estado.en_proceso ?? 0}</span>
                       <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-bold text-amber-800">
                         Urgente
                       </span>
@@ -470,10 +411,7 @@ export default function Inicio() {
                     </div>
                     <div className="mt-2 flex items-baseline gap-2">
                       <span className="text-3xl font-extrabold text-emerald-700">
-                        {(datos.por_estado.resuelta ?? 0) + (datos.por_estado.cerrada ?? 0) || 18}
-                      </span>
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[0.62rem] font-bold text-emerald-800">
-                        89% SLA
+                        {(datos.por_estado.resuelta ?? 0) + (datos.por_estado.cerrada ?? 0)}
                       </span>
                     </div>
                   </div>
@@ -507,7 +445,7 @@ export default function Inicio() {
                             tabBandeja === 'criticos' ? 'bg-white text-red-600 shadow-xs' : 'text-slate-500'
                           }`}
                         >
-                          Críticos (2)
+                          Críticos ({criticos.length})
                         </button>
                         <button
                           type="button"
@@ -516,7 +454,7 @@ export default function Inicio() {
                             tabBandeja === 'asignados' ? 'bg-white text-brand-600 shadow-xs' : 'text-slate-500'
                           }`}
                         >
-                          Mis asignados (1)
+                          Mis asignados ({asignados.length})
                         </button>
                       </div>
 
@@ -541,7 +479,14 @@ export default function Inicio() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {datos.recientes.slice(0, 6).map((item) => (
+                        {bandeja.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                              No hay incidencias en esta bandeja.
+                            </td>
+                          </tr>
+                        )}
+                        {bandeja.slice(0, 6).map((item) => (
                           <tr key={item.codigo} className="transition hover:bg-slate-50/80">
                             <td className="px-4 py-3 align-top">
                               <Folio codigo={item.codigo} />
@@ -601,109 +546,74 @@ export default function Inicio() {
 
                 {/* 2 Columnas Inferiores: Bitácora en Vivo + Infraestructura */}
                 <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-                  {/* Bitácora Técnica en Vivo */}
                   <div className="tarjeta p-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <h3 className="text-xs font-bold text-slate-800">Bitácora Técnica en Vivo</h3>
-                      </div>
+                      <h3 className="text-xs font-bold text-slate-800">Bitácora reciente</h3>
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-medium text-slate-500">
-                        En directo · 3s
+                        {datos.recientes.length} tickets
                       </span>
                     </div>
-
-                    <div className="mt-3.5 space-y-3 text-xs">
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                        <div className="flex items-center justify-between text-[0.68rem] text-slate-400">
-                          <span className="font-mono">12:40:15</span>
-                          <span className="font-semibold text-brand-600">INC-20261019-CR-0017</span>
-                        </div>
-                        <p className="mt-1 font-semibold text-slate-800">
-                          Tec. Javier Martínez añadió 1.5 horas técnicas:
-                        </p>
-                        <p className="mt-0.5 text-slate-600 italic">
-                          "Se procedió al cambio de fábrica de antena UniFi U6-Pro y reasignación de VLAN 120."
-                        </p>
+                    {datos.recientes.length === 0 ? (
+                      <p className="mt-4 text-sm text-slate-500">No hay movimientos. La bitácora se llena al registrar incidencias.</p>
+                    ) : (
+                      <div className="mt-3.5 space-y-3 text-xs">
+                        {datos.recientes.slice(0, 4).map((item) => (
+                          <a
+                            key={item.codigo}
+                            href={`#/incidencias/${encodeURIComponent(item.codigo)}`}
+                            className="block rounded-xl border border-slate-100 bg-slate-50/60 p-3 hover:bg-slate-50"
+                          >
+                            <div className="flex items-center justify-between text-[0.68rem] text-slate-400">
+                              <span>{fecha(item.fecha_creacion)}</span>
+                              <span className="font-semibold text-brand-600">{item.codigo}</span>
+                            </div>
+                            <p className="mt-1 font-semibold text-slate-800">{item.titulo}</p>
+                            <p className="mt-0.5 text-slate-600">
+                              {item.ubicacion?.edificio} · {ESTADOS[item.estado] ?? item.estado}
+                            </p>
+                          </a>
+                        ))}
                       </div>
-
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                        <div className="flex items-center justify-between text-[0.68rem] text-slate-400">
-                          <span className="font-mono">10:15:02</span>
-                          <span className="font-semibold text-red-600">INC-20261019-IN-0012</span>
-                        </div>
-                        <p className="mt-1 font-semibold text-slate-800">
-                          Ing. Javier Martínez (Coord.) escaló prioridad a Crítica
-                        </p>
-                        <p className="mt-0.5 text-slate-600 italic">
-                          "Filtración de agua amenaza rack secundario de cableado estructurado."
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Infraestructura UTM */}
                   <div className="tarjeta p-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2">
                         <Icono nombre="building" className="size-4 text-teal-600" />
-                        <h3 className="text-xs font-bold text-slate-800">Infraestructura UTM</h3>
+                        <h3 className="text-xs font-bold text-slate-800">Incidencias por edificio</h3>
                       </div>
-                      <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[0.65rem] font-bold text-teal-700">
-                        Monitoreo
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-[0.7rem] text-slate-500">
-                      Zonas con mayor reporte de incidencias en campus Huajuapan.
-                    </p>
-
-                    <div className="mt-4 space-y-3 text-xs">
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Edificio B (Laboratorios)</span>
-                          <span>11 incidencias</span>
-                        </div>
-                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-brand-500" style={{ width: '65%' }} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Edificio C (Aulas Nuevas)</span>
-                          <span>9 incidencias</span>
-                        </div>
-                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-orange-500" style={{ width: '48%' }} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Edificio A (Rectoría)</span>
-                          <span>4 incidencias</span>
-                        </div>
-                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-teal-500" style={{ width: '22%' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-[0.68rem] text-slate-400">
-                      <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
-                        <span className="size-1.5 rounded-full bg-emerald-500" /> Clúster Nodos: 3/3 OK
-                      </span>
-                      <a href="#/analitica" className="font-bold text-brand-600 hover:underline">
-                        Ver analítica &rarr;
+                      <a href="#/analitica" className="font-bold text-brand-600 hover:underline text-[0.68rem]">
+                        Ver analítica
                       </a>
                     </div>
+                    {zonas.length === 0 ? (
+                      <p className="mt-4 text-sm text-slate-500">Sin incidencias registradas.</p>
+                    ) : (
+                      <div className="mt-4 space-y-3 text-xs">
+                        {zonas.map(([edificio, total]) => (
+                          <div key={edificio}>
+                            <div className="flex justify-between font-semibold text-slate-700">
+                              <span>{edificio}</span>
+                              <span>{total} {total === 1 ? 'incidencia' : 'incidencias'}</span>
+                            </div>
+                            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-brand-500"
+                                style={{ width: `${Math.round((total / maxZona) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </>
-        )}
+          )
+        }}
       </Cargable>
     </div>
   )
