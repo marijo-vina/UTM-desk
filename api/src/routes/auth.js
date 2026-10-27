@@ -36,3 +36,15 @@ export async function exigirSesion(request, reply) {
     return reply.code(401).send({ error: 'No autorizado' })
   }
 }
+
+/** Guarda de rol: 401 si no hay sesión válida, 403 si el rol no está permitido. */
+export function exigirRoles(...rolesPermitidos) {
+  const permitidos = new Set(rolesPermitidos)
+  return async function preHandler(request, reply) {
+    await exigirSesion(request, reply)
+    if (reply.sent) return
+    if (!permitidos.has(request.user?.rol)) {
+      return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
+    }
+  }
+}

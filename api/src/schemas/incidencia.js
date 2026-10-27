@@ -125,3 +125,77 @@ export const loginBody = {
     contrasena: { type: 'string', minLength: 1, maxLength: 200 },
   },
 }
+
+/** Query de listado/filtros/búsqueda (RF-05, RF-06). pagina/limite llegan como string. */
+export const listadoIncidenciasQuery = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    categoria: { type: 'string', enum: ['computo_redes', 'infraestructura', 'academico'] },
+    estado: {
+      type: 'string',
+      enum: ['abierta', 'en_proceso', 'en_espera', 'resuelta', 'cerrada'],
+    },
+    edificio: { type: 'string', minLength: 1, maxLength: 80 },
+    q: { type: 'string', minLength: 1, maxLength: 200 },
+    pagina: { type: 'string', pattern: '^[1-9]\\d{0,5}$' },
+    limite: { type: 'string', pattern: '^[1-9]\\d{0,2}$' },
+  },
+}
+
+export const codigoIncidenciaParams = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['codigo'],
+  properties: {
+    codigo: { type: 'string', pattern: '^INC-\\d{8}-(CR|IN|AC)-\\d{4}$' },
+  },
+}
+
+/** PATCH de estado y bitácora (RF-03, RF-10). */
+export const patchIncidenciaBody = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['comentario'],
+  properties: {
+    estado: {
+      type: 'string',
+      enum: ['abierta', 'en_proceso', 'en_espera', 'resuelta', 'cerrada'],
+    },
+    comentario: { type: 'string', minLength: 1, maxLength: 2000 },
+    horas_registradas: { type: 'number', minimum: 0 },
+    tecnico_asignado: { type: 'string', minLength: 1, maxLength: 120 },
+  },
+}
+
+const PATRON_TAG = '^[a-z0-9áéíóúüñ-]{2,30}$'
+
+/** Alta de etiqueta ya normalizada (RF-04). */
+export const tagIncidenciaBody = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['tag'],
+  properties: {
+    tag: { type: 'string', pattern: PATRON_TAG },
+  },
+}
+
+export const tagIncidenciaParams = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['codigo', 'tag'],
+  properties: {
+    codigo: { type: 'string', pattern: '^INC-\\d{8}-(CR|IN|AC)-\\d{4}$' },
+    tag: { type: 'string', pattern: PATRON_TAG },
+  },
+}
+
+/** Borrado de una evidencia por su ruta en el bucket (RF-15). */
+export const eliminarEvidenciaBody = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['url_storage'],
+  properties: {
+    url_storage: { type: 'string', minLength: 1, maxLength: 500 },
+  },
+}

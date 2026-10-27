@@ -6,7 +6,7 @@ Monorepo de incidencias del campus. `api`, `db` y `web` se instalan juntos desde
 
 | Carpeta | Equipo | En este corte |
 | --- | --- | --- |
-| `api/` | Backend | `POST /auth/login` y `POST /incidencias` |
+| `api/` | Backend | Auth, incidencias, ciclo de vida, evidencias, etiquetas, analítica y borrado |
 | `db/` | Base de datos | Validador, índices y usuarios de prueba |
 | `web/` | Interfaz | Login y formulario de alta, listo para cambiar el diseño |
 
@@ -35,4 +35,6 @@ El directivo entra y no puede registrar incidencias.
 
 ## Probar sin Atlas
 
-`npm test` cubre el folio en `America/Merida`, el login, el alta y los rechazos 400 y 403.
+`npm test` cubre el folio en `America/Merida`, el login, el alta, el listado, el detalle, el ciclo de vida, evidencias, etiquetas, analítica y borrado.
+
+La colección de Postman está en `postman/UTM-Desk.postman_collection.json`.

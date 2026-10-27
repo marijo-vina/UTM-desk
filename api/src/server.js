@@ -3,6 +3,7 @@ import { Redis } from '@upstash/redis'
 import { buildApp } from './app.js'
 import { config } from './config.js'
 import { crearFolios } from './services/folio.js'
+import { crearStorage } from './services/storage.js'
 
 if (!config.mongodbUri) {
   console.error('Falta MONGODB_URI. Copia .env.example a .env en la raíz del repo.')
@@ -28,9 +29,16 @@ const folios =
         },
       }
 
+const storage = crearStorage({
+  url: config.supabaseUrl,
+  serviceRoleKey: config.supabaseServiceRoleKey,
+  bucket: config.supabaseBucket,
+})
+
 const app = await buildApp({
   mongo,
   folios,
+  storage,
   jwtSecret: config.jwtSecret,
   jwtExpiresIn: config.jwtExpiresIn,
   corsOrigin: config.corsOrigin,
