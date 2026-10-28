@@ -352,7 +352,7 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "archivo", "type": "file", "src": "", "description": "JPEG, PNG o PDF de hasta 5 MB" }
+                { "key": "archivo", "type": "file", "src": "", "description": "JPEG, PNG o PDF de hasta 4 MB" }
               ]
             },
             "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
@@ -384,7 +384,7 @@
           }
         },
         {
-          "name": "Archivo mayor a 5 MB 413",
+          "name": "Archivo mayor a 4 MB 413",
           "event": [
             {
               "listen": "test",
@@ -400,11 +400,11 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "archivo", "type": "file", "src": "", "description": "JPEG o PDF de más de 5 MB" }
+                { "key": "archivo", "type": "file", "src": "", "description": "JPEG o PDF de más de 4 MB" }
               ]
             },
             "url": "{{baseUrl}}/incidencias/{{codigo}}/evidencias",
-            "description": "RF-02. Mayor a 5 MB: HTTP 413."
+            "description": "RF-02. Mayor a 4 MB: HTTP 413."
           }
         },
         {

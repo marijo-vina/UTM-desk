@@ -10,7 +10,7 @@ import {
   tagIncidenciaBody,
   tagIncidenciaParams,
 } from '../schemas/incidencia.js'
-import { LIMITE_EVIDENCIA_BYTES } from '../services/storage.js'
+import { ERROR_EVIDENCIA_GRANDE, LIMITE_EVIDENCIA_BYTES } from '../services/storage.js'
 import { exigirRoles, exigirSesion } from './auth.js'
 
 const LIMITE_MAX = 100
@@ -415,7 +415,7 @@ export async function rutasIncidencias(app) {
         archivo = await request.file()
       } catch (error) {
         if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
         }
         throw error
       }
@@ -432,12 +432,12 @@ export async function rutasIncidencias(app) {
         buffer = await archivo.toBuffer()
       } catch (error) {
         if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
         }
         throw error
       }
       if (buffer.length > LIMITE_EVIDENCIA_BYTES) {
-        return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+        return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
       }
       if (buffer.length === 0) {
         return reply.code(400).send({ error: 'El archivo esta vacio' })

@@ -37,7 +37,7 @@ const INICIAL = {
 const PASOS = ['Categoría & Datos', 'Evidencias', 'Confirmación']
 const PATRON_TAG = /^[a-z0-9áéíóúüñ-]{2,30}$/
 const TIPOS_ARCHIVO = new Set(['image/jpeg', 'image/png', 'application/pdf'])
-const LIMITE_ARCHIVO = 5 * 1024 * 1024
+const LIMITE_ARCHIVO = 4 * 1024 * 1024
 const ETIQUETA_MIME = {
   'image/jpeg': 'JPEG',
   'image/png': 'PNG',
@@ -206,7 +206,7 @@ export default function NuevaIncidencia() {
         continue
       }
       if (file.size > LIMITE_ARCHIVO) {
-        rechazos.push(`${file.name} supera 5 MB.`)
+        rechazos.push(`${file.name} supera 4 MB.`)
         continue
       }
       aceptados.push({
@@ -834,7 +834,7 @@ export default function NuevaIncidencia() {
                   Arrastra evidencias aquí o haz clic para seleccionar
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Formatos admitidos: JPEG, PNG, PDF (Máximo 5 MB por archivo)
+                  Formatos admitidos: JPEG, PNG, PDF (Máximo 4 MB por archivo)
                 </p>
                 <input
                   type="file"

@@ -5,7 +5,7 @@ import Fastify from 'fastify'
 import { rutasAnalitica } from './routes/analitica.js'
 import { rutasAuth } from './routes/auth.js'
 import { rutasIncidencias } from './routes/incidencias.js'
-import { crearStorage, LIMITE_EVIDENCIA_BYTES } from './services/storage.js'
+import { crearStorage, ERROR_EVIDENCIA_GRANDE, LIMITE_EVIDENCIA_BYTES } from './services/storage.js'
 
 export async function buildApp(options) {
   const app = Fastify({
@@ -42,7 +42,7 @@ export async function buildApp(options) {
       return reply.code(400).send({ error: 'Datos invalidos', detalles })
     }
     if (error.code === 'FST_REQ_FILE_TOO_LARGE' || error.statusCode === 413) {
-      return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+      return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
     }
     if (error.statusCode && error.statusCode < 500) {
       return reply.code(error.statusCode).send({ error: error.message })

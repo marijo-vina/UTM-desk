@@ -38,3 +38,17 @@ El directivo entra y no puede registrar incidencias.
 `npm test` cubre el folio en `America/Merida`, el login, el alta, el listado, el detalle, el ciclo de vida, evidencias, etiquetas, analítica y borrado.
 
 La colección de Postman está en `postman/UTM-Desk.postman_collection.json`.
+
+## Publicar en Vercel
+
+Un solo proyecto sirve la interfaz y la API. `vercel.json` manda `/api` a Fastify y el resto a Vite. La interfaz sigue llamando a `/api`; en producción Vercel quita ese prefijo antes de llegar a la API, igual que el proxy local.
+
+En el panel de Vercel:
+
+1. Importa el repositorio y deja la raíz en esta carpeta, no en el directorio padre.
+2. Antes del primer deploy, crea estas variables (los mismos nombres del `.env`): `MONGODB_URI`, `MONGODB_DB`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET`, `CORS_ORIGIN`.
+3. `JWT_SECRET` tiene que ser distinto del ejemplo. `SUPABASE_SERVICE_ROLE_KEY` se queda solo en Vercel, nunca en el frontend.
+4. En Atlas, el acceso de red debe incluir `0.0.0.0/0`, porque las direcciones de Vercel cambian.
+5. Cuando el deploy tenga URL, agrega esa URL a `CORS_ORIGIN` junto a `http://localhost:5173`.
+
+Cada evidencia admite como máximo 4 MB. Vercel rechaza cuerpos de más de 4.5 MB.
