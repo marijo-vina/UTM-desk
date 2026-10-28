@@ -11,12 +11,13 @@ export async function buildApp(options) {
   const app = Fastify({
     logger: options.logger ?? false,
     ajv: { customOptions: { coerceTypes: false, allErrors: true } },
-  })
-
-  app.addHook('onRequest', async (request) => {
-    if (request.url === '/api' || request.url.startsWith('/api/')) {
-      request.raw.url = request.url.replace(/^\/api/, '') || '/'
-    }
+    rewriteUrl(request) {
+      const url = request.url || '/'
+      if (url === '/api' || url.startsWith('/api/') || url.startsWith('/api?')) {
+        return url.replace(/^\/api/, '') || '/'
+      }
+      return url
+    },
   })
 
   await app.register(cors, { origin: options.corsOrigin ?? true })
