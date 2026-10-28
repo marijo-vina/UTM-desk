@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../auth.jsx'
 import { listarIncidencias } from '../api.js'
 import { CATEGORIAS, EDIFICIOS, ESTADOS, PERMISOS } from '../format.js'
@@ -18,6 +19,7 @@ export default function Incidencias() {
   const [edificio, setEdificio] = useState('')
   const [pagina, setPagina] = useState(1)
   const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
+  const [cerrando, setCerrando] = useState(false)
   const qRetrasado = useRetraso(q.trim())
 
   useEffect(() => {
@@ -29,6 +31,26 @@ export default function Incidencias() {
     () => listarIncidencias({ q: qRetrasado, categoria, estado, edificio, page: pagina, limit: 10 }),
     [qRetrasado, categoria, estado, edificio, pagina],
   )
+
+  function cerrarExpediente() {
+    if (cerrando) return
+    setCerrando(true)
+    setTimeout(() => {
+      setIncidenciaSeleccionada(null)
+      setCerrando(false)
+      carga.recargar()
+    }, 280)
+  }
+
+  useEffect(() => {
+    function alPresionarEscape(e) {
+      if (e.key === 'Escape' && incidenciaSeleccionada && !cerrando) {
+        cerrarExpediente()
+      }
+    }
+    window.addEventListener('keydown', alPresionarEscape)
+    return () => window.removeEventListener('keydown', alPresionarEscape)
+  }, [incidenciaSeleccionada, cerrando])
 
   const filtrado = Boolean(q || categoria || estado || edificio)
   const esReportante = usuario.rol === 'reportante'
@@ -189,7 +211,10 @@ export default function Incidencias() {
                 <TablaIncidencias
                   items={datos.items}
                   mostrarReportante={!esReportante}
-                  onVer={(inc) => setIncidenciaSeleccionada(inc.codigo)}
+                  onVer={(inc) => {
+                    setCerrando(false)
+                    setIncidenciaSeleccionada(inc.codigo)
+                  }}
                 />
                 <div className="flex flex-wrap items-center justify-between border-t border-linea px-4 py-3 text-xs text-suave">
                   <p>
@@ -209,31 +234,31 @@ export default function Incidencias() {
         </Cargable>
       </div>
 
-      {/* Pestaña deslizable / Drawer Lateral de Expediente Digital */}
-      {incidenciaSeleccionada && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-navy-950/60 backdrop-blur-xs transition-opacity duration-300"
-          onClick={() => {
-            setIncidenciaSeleccionada(null)
-            carga.recargar()
-          }}
-          role="dialog"
-          aria-modal="true"
-        >
+      {/* Vista Deslizable tipo Pestaña de Expediente Digital (no llega al menú, plantilla lateral 100% altura) */}
+      {incidenciaSeleccionada &&
+        createPortal(
           <div
-            className="relative h-full w-full max-w-4xl md:max-w-3xl lg:w-[60vw] lg:max-w-5xl overflow-y-auto bg-white p-6 shadow-2xl transition-transform animate-drawer border-l border-linea sm:p-8"
-            onClick={(e) => e.stopPropagation()}
+            className={`fixed inset-0 z-50 flex justify-end bg-navy-950/60 backdrop-blur-xs transition-opacity duration-300 ${
+              cerrando ? 'opacity-0' : 'opacity-100'
+            }`}
+            onClick={cerrarExpediente}
+            role="dialog"
+            aria-modal="true"
           >
-            <Detalle
-              codigo={incidenciaSeleccionada}
-              alCerrar={() => {
-                setIncidenciaSeleccionada(null)
-                carga.recargar()
-              }}
-            />
-          </div>
-        </div>
-      )}
+            <div
+              className={`relative h-full w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl bg-white shadow-2xl flex flex-col border-l border-linea overflow-hidden ${
+                cerrando ? 'animate-drawer-sale' : 'animate-drawer'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Detalle
+                codigo={incidenciaSeleccionada}
+                alCerrar={cerrarExpediente}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

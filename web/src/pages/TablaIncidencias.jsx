@@ -4,7 +4,7 @@ import { Folio, Icono, InsigniaCategoria, InsigniaEstado, InsigniaPrioridad } fr
 export default function TablaIncidencias({ items, mostrarReportante = false, onVer }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[46rem] text-left text-sm">
+      <table className="w-full min-w-[56rem] text-left text-sm">
         <thead>
           <tr className="border-b border-linea text-[0.68rem] tracking-wider text-suave uppercase">
             <th className="px-4 py-3 font-semibold">Folio</th>
@@ -20,12 +20,12 @@ export default function TablaIncidencias({ items, mostrarReportante = false, onV
         <tbody>
           {items.map((incidencia) => (
             <tr key={incidencia.codigo} className="border-b border-linea/70 transition last:border-0 hover:bg-brand-50/50">
-              <td className="px-4 py-3.5 align-top">
+              <td className="px-4 py-3.5 align-top whitespace-nowrap">
                 <Folio codigo={incidencia.codigo} />
               </td>
-              <td className="max-w-xs px-4 py-3.5 align-top">
-                <p className="truncate font-semibold">{incidencia.titulo}</p>
-                <p className="mt-0.5 truncate text-xs text-suave">
+              <td className="max-w-md xl:max-w-xl px-4 py-3.5 align-top">
+                <p className="font-semibold text-slate-900 leading-snug line-clamp-2">{incidencia.titulo}</p>
+                <p className="mt-1 text-xs text-suave">
                   {incidencia.ubicacion?.edificio} · {incidencia.ubicacion?.aula_o_zona}
                 </p>
               </td>

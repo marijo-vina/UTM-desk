@@ -8,7 +8,7 @@ Monorepo de incidencias del campus. `api`, `db` y `web` se instalan juntos desde
 | --- | --- | --- |
 | `api/` | Backend | Auth, incidencias, ciclo de vida, evidencias, etiquetas, analítica y borrado |
 | `db/` | Base de datos | Validador, índices, cinco usuarios y 24 incidencias de prueba |
-| `web/` | Interfaz | Login y formulario de alta, listo para cambiar el diseño |
+| `web/` | Interfaz | Login, tablero, listado, alta, expediente digital y analítica |
 
 El catálogo de categorías, roles y estados está en `db/schema/catalogo.js`. La API lo usa como `@utm-desk/db/catalogo`.
 
