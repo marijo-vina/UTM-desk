@@ -1,12 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install",
   "services": {
     "web": {
-      "root": "web/"
+      "root": "web/",
+      "installCommand": "npm install --prefix .."
     },
     "api": {
       "root": "api/",
+      "installCommand": "npm install --prefix ..",
       "routes": [
         {
           "src": "/api/(.*)",
