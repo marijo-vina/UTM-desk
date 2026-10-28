@@ -25,7 +25,8 @@
 
   --animate-aparece: aparece 0.35s ease-out both;
   --animate-desliza: desliza 0.3s ease-out both;
-  --animate-drawer: desliza-derecha 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-drawer: desliza-derecha 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-drawer-sale: desliza-derecha-sale 0.28s ease-in both;
 
   @keyframes aparece {
     from {
@@ -34,7 +35,7 @@
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: none;
     }
   }
   @keyframes desliza {
@@ -52,7 +53,15 @@
       transform: translateX(100%);
     }
     to {
-      transform: translateX(0);
+      transform: none;
+    }
+  }
+  @keyframes desliza-derecha-sale {
+    from {
+      transform: none;
+    }
+    to {
+      transform: translateX(100%);
     }
   }
 }

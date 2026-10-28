@@ -52,7 +52,7 @@ export default function Shell({ actual, titulo, children }) {
   return (
     <div
       className={`min-h-screen transition-all duration-300 ${
-        colapsado ? 'lg:grid lg:grid-cols-[5.25rem_1fr]' : 'lg:grid lg:grid-cols-[17rem_1fr]'
+        colapsado ? 'lg:grid lg:grid-cols-[5.25rem_1fr] menu-colapsado' : 'lg:grid lg:grid-cols-[17rem_1fr] menu-expandido'
       }`}
     >
       {/* Fondo móvil */}
