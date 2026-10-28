@@ -13,6 +13,12 @@ export async function buildApp(options) {
     ajv: { customOptions: { coerceTypes: false, allErrors: true } },
   })
 
+  app.addHook('onRequest', async (request) => {
+    if (request.url === '/api' || request.url.startsWith('/api/')) {
+      request.raw.url = request.url.replace(/^\/api/, '') || '/'
+    }
+  })
+
   await app.register(cors, { origin: options.corsOrigin ?? true })
   await app.register(jwt, {
     secret: options.jwtSecret,
