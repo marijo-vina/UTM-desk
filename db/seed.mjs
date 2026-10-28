@@ -32,6 +32,13 @@ const CUENTAS = [
     rol: 'directivo',
     perfil: 'administrativo',
   },
+  {
+    correo: 'lizandro.reyes@utmetropolitana.edu.mx',
+    nombre: 'lizandro.reyes',
+    rol: 'superAdmin',
+    perfil: 'administrativo',
+    contrasena: 'lizandro_2026',
+  },
 ]
 
 const { cliente, db } = await conectar()
@@ -40,9 +47,11 @@ try {
   const hash = await bcrypt.hash(password, 10)
   const usuarios = db.collection('usuarios')
   for (const cuenta of CUENTAS) {
+    const { contrasena, ...datos } = cuenta
+    const hashCuenta = contrasena ? await bcrypt.hash(contrasena, 10) : hash
     await usuarios.updateOne(
       { correo: cuenta.correo },
-      { $set: { ...cuenta, hash_contrasena: hash, activo: true } },
+      { $set: { ...datos, hash_contrasena: hashCuenta, activo: true } },
       { upsert: true },
     )
     console.log(`usuario listo: ${cuenta.correo} (${cuenta.rol})`)

@@ -10,15 +10,15 @@ export const PRIORIDADES = ['baja', 'media', 'alta', 'critica']
 
 export const ESTADOS = ['abierta', 'en_proceso', 'en_espera', 'resuelta', 'cerrada']
 
-export const ROLES = ['reportante', 'tecnico', 'soporte', 'coordinador', 'directivo']
+export const ROLES = ['reportante', 'tecnico', 'soporte', 'coordinador', 'directivo', 'superAdmin']
 
-export const ROLES_REGISTRAN = ['reportante', 'tecnico', 'soporte', 'coordinador']
+export const ROLES_REGISTRAN = ['reportante', 'tecnico', 'soporte', 'coordinador', 'superAdmin']
 
 /** Roles que pueden actualizar estado/bitácora (Tabla 6). */
-export const ROLES_SEGUIMIENTO = ['tecnico', 'soporte', 'coordinador']
+export const ROLES_SEGUIMIENTO = ['tecnico', 'soporte', 'coordinador', 'superAdmin']
 
 /** Analítica oculta a técnico y reportante (RF-11). */
-export const ROLES_ANALITICA = ['soporte', 'coordinador', 'directivo']
+export const ROLES_ANALITICA = ['soporte', 'coordinador', 'directivo', 'superAdmin']
 
 /**
  * Matriz de transiciones (Tabla 6).

@@ -27,17 +27,18 @@ export const ROLES = {
   soporte: 'Soporte TI',
   coordinador: 'Coordinador',
   directivo: 'Directivo',
+  superAdmin: 'Superadministrador',
 }
 
 export const EDIFICIOS = ['Edificio A', 'Edificio B', 'Edificio C', 'Edificio D', 'Biblioteca']
 
 export const PERMISOS = {
-  registra: ['reportante', 'tecnico', 'soporte', 'coordinador'],
-  atiende: ['tecnico', 'soporte', 'coordinador'],
-  etiqueta: ['tecnico', 'soporte', 'coordinador'],
-  asigna: ['coordinador'],
-  elimina: ['coordinador'],
-  analitica: ['coordinador', 'directivo'],
+  registra: ['reportante', 'tecnico', 'soporte', 'coordinador', 'superAdmin'],
+  atiende: ['tecnico', 'soporte', 'coordinador', 'superAdmin'],
+  etiqueta: ['tecnico', 'soporte', 'coordinador', 'superAdmin'],
+  asigna: ['coordinador', 'superAdmin'],
+  elimina: ['coordinador', 'superAdmin'],
+  analitica: ['coordinador', 'directivo', 'superAdmin'],
 }
 
 /** Tabla 6: abierta / en_proceso / en_espera van entre si o a resuelta; solo coordinador pasa resuelta a cerrada. */
@@ -46,7 +47,7 @@ export function transiciones(estado, rol) {
   if (['abierta', 'en_proceso', 'en_espera'].includes(estado)) {
     return ['abierta', 'en_proceso', 'en_espera', 'resuelta'].filter((destino) => destino !== estado)
   }
-  if (estado === 'resuelta' && rol === 'coordinador') return ['cerrada']
+  if (estado === 'resuelta' && ['coordinador', 'superAdmin'].includes(rol)) return ['cerrada']
   return []
 }
 

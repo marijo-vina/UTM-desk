@@ -25,7 +25,7 @@ La API queda en `http://localhost:3000` y la interfaz en `http://localhost:5173`
 
 En Supabase el bucket se llama `evidencias` y es privado. En el `.env` va la llave `service_role`, no la `anon` ni la publishable. El `.env` no se sube a Git.
 
-La contraseña de las cuentas semilla es `SEED_PASSWORD` (en el ejemplo, `utmdesk123`).
+La contraseña de las cuentas semilla es `SEED_PASSWORD` (en el ejemplo, `utmdesk123`). La cuenta `lizandro.reyes@utmetropolitana.edu.mx` usa `lizandro_2026`.
 
 | Correo | Rol |
 | --- | --- |
@@ -34,8 +34,9 @@ La contraseña de las cuentas semilla es `SEED_PASSWORD` (en el ejemplo, `utmdes
 | `soporte@utm.mx` | soporte |
 | `coordinador@utm.mx` | coordinador |
 | `directivo@utm.mx` | directivo |
+| `lizandro.reyes@utmetropolitana.edu.mx` | superAdmin |
 
-El directivo entra y no puede registrar incidencias. Solo el coordinador cierra un ticket, y solo si ya está resuelto.
+El directivo entra y no puede registrar incidencias. El coordinador y el superAdmin cierran un ticket, y solo si ya está resuelto.
 
 ## Probar sin Atlas
 

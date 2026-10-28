@@ -51,7 +51,7 @@ function esPropia(request, incidencia) {
 /** null si puede escribir; 401 o 403 si no. El directivo solo consulta. */
 function accesoEscritura(request, incidencia) {
   const rol = request.user.rol
-  if (rol === 'tecnico' || rol === 'soporte' || rol === 'coordinador') return null
+  if (rol === 'tecnico' || rol === 'soporte' || rol === 'coordinador' || rol === 'superAdmin') return null
   if (rol === 'reportante') {
     if (!objetoIdDeSesion(request)) return 401
     return esPropia(request, incidencia) ? null : 403
@@ -335,7 +335,7 @@ export async function rutasIncidencias(app) {
         return reply.code(404).send({ error: 'Incidencia no encontrada' })
       }
 
-      if (cuerpo.tecnico_asignado !== undefined && request.user.rol !== 'coordinador') {
+      if (cuerpo.tecnico_asignado !== undefined && !['coordinador', 'superAdmin'].includes(request.user.rol)) {
         return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
       }
 
@@ -347,7 +347,7 @@ export async function rutasIncidencias(app) {
         return reply.code(409).send({ error: 'Transicion de estado no permitida' })
       }
 
-      if (estadoNuevo === 'cerrada' && request.user.rol !== 'coordinador') {
+      if (estadoNuevo === 'cerrada' && !['coordinador', 'superAdmin'].includes(request.user.rol)) {
         return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
       }
 
@@ -492,7 +492,7 @@ export async function rutasIncidencias(app) {
     '/incidencias/:codigo/evidencias',
     {
       schema: { params: codigoIncidenciaParams, body: eliminarEvidenciaBody },
-      preHandler: exigirRoles('coordinador'),
+      preHandler: exigirRoles('coordinador', 'superAdmin'),
     },
     async (request, reply) => {
       const { codigo } = request.params
@@ -604,7 +604,7 @@ export async function rutasIncidencias(app) {
     '/incidencias/:codigo',
     {
       schema: { params: codigoIncidenciaParams },
-      preHandler: exigirRoles('coordinador'),
+      preHandler: exigirRoles('coordinador', 'superAdmin'),
     },
     async (request, reply) => {
       const { codigo } = request.params
