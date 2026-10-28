@@ -1096,6 +1096,28 @@ test('M4: evidencias y etiquetas', async (t) => {
   assert.equal(tipoInvalido.statusCode, 415)
   assert.equal(subidas.length, 1)
 
+  const pdf = await app.inject({
+    method: 'POST',
+    url: '/incidencias/INC-20261022-CR-0001/evidencias',
+    headers: {
+      authorization: `Bearer ${tokenAna}`,
+      'content-type': cuerpoMultipart({
+        nombre: 'reporte.pdf',
+        mime: 'application/octet-stream',
+        contenido: '%PDF-1.4',
+      }).headers['content-type'],
+    },
+    payload: cuerpoMultipart({
+      nombre: 'reporte.pdf',
+      mime: 'application/octet-stream',
+      contenido: '%PDF-1.4',
+    }).payload,
+  })
+  assert.equal(pdf.statusCode, 201)
+  assert.equal(pdf.json().tipo_mime, 'application/pdf')
+  assert.equal(pdf.json().nombre_archivo, 'reporte.pdf')
+  assert.equal(subidas.length, 2)
+
   const grande = await app.inject({
     method: 'POST',
     url: '/incidencias/INC-20261022-CR-0001/evidencias',
@@ -1114,7 +1136,7 @@ test('M4: evidencias y etiquetas', async (t) => {
     }).payload,
   })
   assert.equal(grande.statusCode, 413)
-  assert.equal(subidas.length, 1)
+  assert.equal(subidas.length, 2)
 
   const inexistente = await app.inject({
     method: 'POST',

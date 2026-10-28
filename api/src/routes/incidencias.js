@@ -84,6 +84,15 @@ function nombreSeguro(nombre) {
   return limpio || 'evidencia'
 }
 
+function tipoEvidencia(archivo) {
+  if (TIPOS_EVIDENCIA.includes(archivo.mimetype)) return archivo.mimetype
+  const nombre = String(archivo.filename || '').toLowerCase()
+  if (nombre.endsWith('.pdf')) return 'application/pdf'
+  if (nombre.endsWith('.png')) return 'image/png'
+  if (nombre.endsWith('.jpg') || nombre.endsWith('.jpeg')) return 'image/jpeg'
+  return archivo.mimetype
+}
+
 function responderErrorMongo(error, reply) {
   if (error.code === 121) {
     return reply.code(400).send({ error: 'El documento no cumple el esquema' })
@@ -412,7 +421,8 @@ export async function rutasIncidencias(app) {
       }
       if (!archivo) return reply.code(400).send({ error: 'Falta el archivo' })
 
-      if (!TIPOS_EVIDENCIA.includes(archivo.mimetype)) {
+      const tipo = tipoEvidencia(archivo)
+      if (!TIPOS_EVIDENCIA.includes(tipo)) {
         archivo.file.resume()
         return reply.code(415).send({ error: 'Tipo de archivo no permitido' })
       }
@@ -438,12 +448,12 @@ export async function rutasIncidencias(app) {
       await app.storage.subirEvidencia({
         ruta,
         buffer,
-        contentType: archivo.mimetype,
+        contentType: tipo,
       })
 
       const evidencia = {
         nombre_archivo: nombre,
-        tipo_mime: archivo.mimetype,
+        tipo_mime: tipo,
         peso_kb: Math.ceil(buffer.length / 1024),
         url_storage: ruta,
         fecha_carga: new Date(),
