@@ -1,0 +1,32 @@
+---
+description: Tras cada cambio de backend, actualizar el Word de módulos y RF
+alwaysApply: true
+---
+
+# Documentación viva de módulos
+
+Después de **cada** cambio relevante en el backend (`api/`, `db/`), actualizar:
+
+`Modulos_y_Requisitos_Funcionales.docx`
+
+## Cómo actualizarlo
+
+1. Editar `_actualizar_doc_modulos.py`:
+   - Nueva entrada en la sección **changelog** (qué, por qué/RF, cómo funciona).
+   - Tabla de **estado de módulos** si cambió Completo/Parcial/Pendiente.
+   - **Catálogo de rutas** si hay endpoints nuevos.
+   - Sección **cómo funciona** del módulo tocado.
+2. Regenerar el `.docx`:
+
+```powershell
+python _actualizar_doc_modulos.py
+```
+
+3. No documentar secretos ni valores de `.env`.
+
+## Contenido mínimo por cambio
+
+- Archivos tocados
+- Rutas HTTP (método, auth, códigos)
+- RF cubiertos
+- Comportamiento / reglas de negocio

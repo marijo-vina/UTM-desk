@@ -1,11 +1,16 @@
+import { randomBytes } from 'node:crypto'
 import { ObjectId } from 'mongodb'
-import { ROLES_REGISTRAN, ROLES_SEGUIMIENTO, TRANSICIONES } from '@utm-desk/db/catalogo'
+import { ROLES_REGISTRAN, ROLES_SEGUIMIENTO, TIPOS_EVIDENCIA, TRANSICIONES } from '@utm-desk/db/catalogo'
 import {
   altaIncidenciaBody,
   codigoIncidenciaParams,
+  eliminarEvidenciaBody,
   listadoIncidenciasQuery,
   patchIncidenciaBody,
+  tagIncidenciaBody,
+  tagIncidenciaParams,
 } from '../schemas/incidencia.js'
+import { ERROR_EVIDENCIA_GRANDE, LIMITE_EVIDENCIA_BYTES } from '../services/storage.js'
 import { exigirRoles, exigirSesion } from './auth.js'
 
 const LIMITE_MAX = 100
@@ -32,6 +37,67 @@ function filtroVisibilidad(request) {
   const usuarioId = objetoIdDeSesion(request)
   if (!usuarioId) return null
   return { 'reportante.usuario_id': usuarioId }
+}
+
+function esPropia(request, incidencia) {
+  const usuarioId = objetoIdDeSesion(request)
+  if (!usuarioId) return false
+  return (
+    incidencia.reportante?.usuario_id?.equals?.(usuarioId) ??
+    String(incidencia.reportante?.usuario_id) === String(usuarioId)
+  )
+}
+
+/** null si puede escribir; 401 o 403 si no. El directivo solo consulta. */
+function accesoEscritura(request, incidencia) {
+  const rol = request.user.rol
+  if (rol === 'tecnico' || rol === 'soporte' || rol === 'coordinador') return null
+  if (rol === 'reportante') {
+    if (!objetoIdDeSesion(request)) return 401
+    return esPropia(request, incidencia) ? null : 403
+  }
+  return 403
+}
+
+function responderCodigo(reply, codigo) {
+  if (codigo === 401) return reply.code(401).send({ error: 'No autorizado' })
+  return reply.code(403).send({ error: 'No tienes permiso para esta operacion' })
+}
+
+function normalizarTagBody(request, _reply, done) {
+  if (typeof request.body?.tag === 'string') {
+    request.body.tag = request.body.tag.trim().toLowerCase()
+  }
+  done()
+}
+
+function normalizarTagParam(request, _reply, done) {
+  if (typeof request.params?.tag === 'string') {
+    request.params.tag = request.params.tag.trim().toLowerCase()
+  }
+  done()
+}
+
+function nombreSeguro(nombre) {
+  const base = String(nombre || 'evidencia').split(/[/\\]/).pop()
+  const limpio = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
+  return limpio || 'evidencia'
+}
+
+function tipoEvidencia(archivo) {
+  if (TIPOS_EVIDENCIA.includes(archivo.mimetype)) return archivo.mimetype
+  const nombre = String(archivo.filename || '').toLowerCase()
+  if (nombre.endsWith('.pdf')) return 'application/pdf'
+  if (nombre.endsWith('.png')) return 'image/png'
+  if (nombre.endsWith('.jpg') || nombre.endsWith('.jpeg')) return 'image/jpeg'
+  return archivo.mimetype
+}
+
+function responderErrorMongo(error, reply) {
+  if (error.code === 121) {
+    return reply.code(400).send({ error: 'El documento no cumple el esquema' })
+  }
+  return null
 }
 
 function serializarIncidencia(doc, extras = {}) {
@@ -324,6 +390,238 @@ export async function rutasIncidencias(app) {
 
       const actualizada = await coleccion.findOne({ codigo })
       return reply.code(200).send(serializarIncidencia(actualizada))
+    },
+  )
+
+  app.post(
+    '/incidencias/:codigo/evidencias',
+    {
+      schema: { params: codigoIncidenciaParams },
+      preHandler: exigirSesion,
+    },
+    async (request, reply) => {
+      const { codigo } = request.params
+      const coleccion = app.mongo.collection('incidencias_campus')
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const acceso = accesoEscritura(request, incidencia)
+      if (acceso) return responderCodigo(reply, acceso)
+
+      let archivo
+      try {
+        archivo = await request.file()
+      } catch (error) {
+        if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
+        }
+        throw error
+      }
+      if (!archivo) return reply.code(400).send({ error: 'Falta el archivo' })
+
+      const tipo = tipoEvidencia(archivo)
+      if (!TIPOS_EVIDENCIA.includes(tipo)) {
+        archivo.file.resume()
+        return reply.code(415).send({ error: 'Tipo de archivo no permitido' })
+      }
+
+      let buffer
+      try {
+        buffer = await archivo.toBuffer()
+      } catch (error) {
+        if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
+        }
+        throw error
+      }
+      if (buffer.length > LIMITE_EVIDENCIA_BYTES) {
+        return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
+      }
+      if (buffer.length === 0) {
+        return reply.code(400).send({ error: 'El archivo esta vacio' })
+      }
+
+      const nombre = nombreSeguro(archivo.filename)
+      const ruta = `${codigo}/${Date.now()}-${randomBytes(4).toString('hex')}-${nombre}`
+      await app.storage.subirEvidencia({
+        ruta,
+        buffer,
+        contentType: tipo,
+      })
+
+      const evidencia = {
+        nombre_archivo: nombre,
+        tipo_mime: tipo,
+        peso_kb: Math.ceil(buffer.length / 1024),
+        url_storage: ruta,
+        fecha_carga: new Date(),
+      }
+
+      try {
+        const resultado = await coleccion.updateOne(
+          { codigo },
+          {
+            $push: { evidencias_adjuntas: evidencia },
+            $set: { fecha_actualizacion: new Date() },
+          },
+        )
+        if (resultado.matchedCount === 0) {
+          await app.storage.eliminarObjeto(ruta)
+          return reply.code(404).send({ error: 'Incidencia no encontrada' })
+        }
+      } catch (error) {
+        await app.storage.eliminarObjeto(ruta).catch(() => {})
+        const respuesta = responderErrorMongo(error, reply)
+        if (respuesta) return respuesta
+        throw error
+      }
+
+      return reply.code(201).send({
+        nombre_archivo: evidencia.nombre_archivo,
+        tipo_mime: evidencia.tipo_mime,
+        peso_kb: evidencia.peso_kb,
+        url_storage: evidencia.url_storage,
+        fecha_carga: evidencia.fecha_carga.toISOString(),
+      })
+    },
+  )
+
+  app.delete(
+    '/incidencias/:codigo/evidencias',
+    {
+      schema: { params: codigoIncidenciaParams, body: eliminarEvidenciaBody },
+      preHandler: exigirRoles('coordinador'),
+    },
+    async (request, reply) => {
+      const { codigo } = request.params
+      const { url_storage } = request.body
+      const coleccion = app.mongo.collection('incidencias_campus')
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const existe = (incidencia.evidencias_adjuntas ?? []).some(
+        (item) => item.url_storage === url_storage,
+      )
+      if (!existe) {
+        return reply.code(404).send({ error: 'Evidencia no encontrada' })
+      }
+
+      await app.storage.eliminarObjeto(url_storage)
+      const resultado = await coleccion.updateOne(
+        { codigo },
+        {
+          $pull: { evidencias_adjuntas: { url_storage } },
+          $set: { fecha_actualizacion: new Date() },
+        },
+      )
+      if (resultado.matchedCount === 0) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      return reply.code(200).send({ codigo, url_storage, eliminada: true })
+    },
+  )
+
+  app.post(
+    '/incidencias/:codigo/tags',
+    {
+      schema: { params: codigoIncidenciaParams, body: tagIncidenciaBody },
+      preValidation: normalizarTagBody,
+      preHandler: exigirSesion,
+    },
+    async (request, reply) => {
+      const { codigo } = request.params
+      const coleccion = app.mongo.collection('incidencias_campus')
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const acceso = accesoEscritura(request, incidencia)
+      if (acceso) return responderCodigo(reply, acceso)
+
+      try {
+        const resultado = await coleccion.updateOne(
+          { codigo },
+          {
+            $addToSet: { tags: request.body.tag },
+            $set: { fecha_actualizacion: new Date() },
+          },
+        )
+        if (resultado.matchedCount === 0) {
+          return reply.code(404).send({ error: 'Incidencia no encontrada' })
+        }
+      } catch (error) {
+        const respuesta = responderErrorMongo(error, reply)
+        if (respuesta) return respuesta
+        throw error
+      }
+
+      const actualizada = await coleccion.findOne({ codigo })
+      return reply.code(200).send({ codigo, tags: actualizada?.tags ?? [] })
+    },
+  )
+
+  app.delete(
+    '/incidencias/:codigo/tags/:tag',
+    {
+      schema: { params: tagIncidenciaParams },
+      preValidation: normalizarTagParam,
+      preHandler: exigirSesion,
+    },
+    async (request, reply) => {
+      const { codigo, tag } = request.params
+      const coleccion = app.mongo.collection('incidencias_campus')
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const acceso = accesoEscritura(request, incidencia)
+      if (acceso) return responderCodigo(reply, acceso)
+
+      const resultado = await coleccion.updateOne(
+        { codigo },
+        {
+          $pull: { tags: tag },
+          $set: { fecha_actualizacion: new Date() },
+        },
+      )
+      if (resultado.matchedCount === 0) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const actualizada = await coleccion.findOne({ codigo })
+      return reply.code(200).send({ codigo, tags: actualizada?.tags ?? [] })
+    },
+  )
+
+  app.delete(
+    '/incidencias/:codigo',
+    {
+      schema: { params: codigoIncidenciaParams },
+      preHandler: exigirRoles('coordinador'),
+    },
+    async (request, reply) => {
+      const { codigo } = request.params
+      const coleccion = app.mongo.collection('incidencias_campus')
+      const incidencia = await coleccion.findOne({ codigo })
+      if (!incidencia) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      const rutas = (incidencia.evidencias_adjuntas ?? []).map((item) => item.url_storage)
+      await app.storage.eliminarObjetos(rutas)
+      const resultado = await coleccion.deleteOne({ codigo })
+      if (resultado.deletedCount === 0) {
+        return reply.code(404).send({ error: 'Incidencia no encontrada' })
+      }
+
+      return reply.code(200).send({ codigo, eliminada: true })
     },
   )
 }
