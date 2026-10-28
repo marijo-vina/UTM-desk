@@ -71,15 +71,16 @@ function consultaLimpia(consulta) {
 async function pedir(ruta, { metodo = 'GET', cuerpo, consulta, autenticado = true } = {}) {
   const headers = {}
   const token = autenticado ? leerSesion()?.token : null
+  const formulario = typeof FormData !== 'undefined' && cuerpo instanceof FormData
   if (token) headers.Authorization = `Bearer ${token}`
-  if (cuerpo !== undefined) headers['Content-Type'] = 'application/json'
+  if (cuerpo !== undefined && !formulario) headers['Content-Type'] = 'application/json'
 
   let respuesta
   try {
     respuesta = await fetch(`/api${ruta}${consultaLimpia(consulta)}`, {
       method: metodo,
       headers,
-      body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
+      body: cuerpo !== undefined ? (formulario ? cuerpo : JSON.stringify(cuerpo)) : undefined,
     })
   } catch {
     throw new ErrorApi('No hay conexión con el servidor. Verifica que la API esté en ejecución.', {
@@ -123,6 +124,12 @@ export async function iniciarSesion(correo, contrasena) {
 
 export async function registrarIncidencia(incidencia) {
   return pedir('/incidencias', { metodo: 'POST', cuerpo: incidencia })
+}
+
+export function subirEvidencia(codigo, archivo) {
+  const cuerpo = new FormData()
+  cuerpo.append('archivo', archivo)
+  return pedir(`${rutaIncidencia(codigo)}/evidencias`, { metodo: 'POST', cuerpo })
 }
 
 const rutaIncidencia = (codigo) => `/incidencias/${encodeURIComponent(codigo)}`

@@ -10,7 +10,7 @@ import {
   tagIncidenciaBody,
   tagIncidenciaParams,
 } from '../schemas/incidencia.js'
-import { LIMITE_EVIDENCIA_BYTES } from '../services/storage.js'
+import { ERROR_EVIDENCIA_GRANDE, LIMITE_EVIDENCIA_BYTES } from '../services/storage.js'
 import { exigirRoles, exigirSesion } from './auth.js'
 
 const LIMITE_MAX = 100
@@ -82,6 +82,15 @@ function nombreSeguro(nombre) {
   const base = String(nombre || 'evidencia').split(/[/\\]/).pop()
   const limpio = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
   return limpio || 'evidencia'
+}
+
+function tipoEvidencia(archivo) {
+  if (TIPOS_EVIDENCIA.includes(archivo.mimetype)) return archivo.mimetype
+  const nombre = String(archivo.filename || '').toLowerCase()
+  if (nombre.endsWith('.pdf')) return 'application/pdf'
+  if (nombre.endsWith('.png')) return 'image/png'
+  if (nombre.endsWith('.jpg') || nombre.endsWith('.jpeg')) return 'image/jpeg'
+  return archivo.mimetype
 }
 
 function responderErrorMongo(error, reply) {
@@ -406,13 +415,14 @@ export async function rutasIncidencias(app) {
         archivo = await request.file()
       } catch (error) {
         if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
         }
         throw error
       }
       if (!archivo) return reply.code(400).send({ error: 'Falta el archivo' })
 
-      if (!TIPOS_EVIDENCIA.includes(archivo.mimetype)) {
+      const tipo = tipoEvidencia(archivo)
+      if (!TIPOS_EVIDENCIA.includes(tipo)) {
         archivo.file.resume()
         return reply.code(415).send({ error: 'Tipo de archivo no permitido' })
       }
@@ -422,12 +432,12 @@ export async function rutasIncidencias(app) {
         buffer = await archivo.toBuffer()
       } catch (error) {
         if (error.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+          return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
         }
         throw error
       }
       if (buffer.length > LIMITE_EVIDENCIA_BYTES) {
-        return reply.code(413).send({ error: 'El archivo supera 5 MB' })
+        return reply.code(413).send({ error: ERROR_EVIDENCIA_GRANDE })
       }
       if (buffer.length === 0) {
         return reply.code(400).send({ error: 'El archivo esta vacio' })
@@ -438,12 +448,12 @@ export async function rutasIncidencias(app) {
       await app.storage.subirEvidencia({
         ruta,
         buffer,
-        contentType: archivo.mimetype,
+        contentType: tipo,
       })
 
       const evidencia = {
         nombre_archivo: nombre,
-        tipo_mime: archivo.mimetype,
+        tipo_mime: tipo,
         peso_kb: Math.ceil(buffer.length / 1024),
         url_storage: ruta,
         fecha_carga: new Date(),

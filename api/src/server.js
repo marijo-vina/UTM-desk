@@ -15,42 +15,50 @@ if (!config.jwtSecret) {
 }
 
 const cliente = new MongoClient(config.mongodbUri)
-await cliente.connect()
-const mongo = cliente.db(config.mongodbDb)
 
-const folios =
-  config.redisUrl && config.redisToken
-    ? crearFolios(new Redis({ url: config.redisUrl, token: config.redisToken }))
-    : {
-        async siguiente() {
-          const error = new Error('Redis no esta configurado. Completa UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN.')
-          error.statusCode = 503
-          throw error
-        },
-      }
+async function arrancar() {
+  await cliente.connect()
+  const mongo = cliente.db(config.mongodbDb)
 
-const storage = crearStorage({
-  url: config.supabaseUrl,
-  serviceRoleKey: config.supabaseServiceRoleKey,
-  bucket: config.supabaseBucket,
-})
+  const folios =
+    config.redisUrl && config.redisToken
+      ? crearFolios(new Redis({ url: config.redisUrl, token: config.redisToken }))
+      : {
+          async siguiente() {
+            const error = new Error('Redis no esta configurado. Completa UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN.')
+            error.statusCode = 503
+            throw error
+          },
+        }
 
-const app = await buildApp({
-  mongo,
-  folios,
-  storage,
-  jwtSecret: config.jwtSecret,
-  jwtExpiresIn: config.jwtExpiresIn,
-  corsOrigin: config.corsOrigin,
-  logger: true,
-})
-
-await app.listen({ port: config.port, host: '0.0.0.0' })
-
-for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, async () => {
-    await app.close()
-    await cliente.close()
-    process.exit(0)
+  const storage = crearStorage({
+    url: config.supabaseUrl,
+    serviceRoleKey: config.supabaseServiceRoleKey,
+    bucket: config.supabaseBucket,
   })
+
+  const app = await buildApp({
+    mongo,
+    folios,
+    storage,
+    jwtSecret: config.jwtSecret,
+    jwtExpiresIn: config.jwtExpiresIn,
+    corsOrigin: config.corsOrigin,
+    logger: true,
+  })
+
+  await app.listen({ port: config.port, host: '0.0.0.0' })
+
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, async () => {
+      await app.close()
+      await cliente.close()
+      process.exit(0)
+    })
+  }
 }
+
+arrancar().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

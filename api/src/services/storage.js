@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-/** Tope de RF-02: mayor a 5 MB responde 413. */
-export const LIMITE_EVIDENCIA_BYTES = 5 * 1024 * 1024
+/** Tope de RF-02. 4 MB cabe en el cuerpo máximo de una función de Vercel (4.5 MB). */
+export const LIMITE_EVIDENCIA_BYTES = 4 * 1024 * 1024
+export const ERROR_EVIDENCIA_GRANDE = 'El archivo supera 4 MB'
 
 const SEGUNDOS_FIRMA = 3600
 
