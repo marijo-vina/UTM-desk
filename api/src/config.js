@@ -26,7 +26,7 @@ function loadEnv() {
 loadEnv()
 
 export const config = {
-  port: Number(process.env.API_PORT || 3000),
+  port: Number(process.env.PORT || process.env.API_PORT || 3000),
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDb: process.env.MONGODB_DB || 'utm_desk',
   redisUrl: process.env.UPSTASH_REDIS_REST_URL || '',

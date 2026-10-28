@@ -7,6 +7,8 @@
     },
     "api": {
       "root": "api/",
+      "framework": "fastify",
+      "entrypoint": "src/server.js",
       "installCommand": "npm install --prefix ..",
       "routes": [
         {
