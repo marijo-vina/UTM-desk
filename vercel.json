@@ -2,14 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "web": {
-      "root": "web/",
-      "installCommand": "npm install --prefix .."
+      "root": "web/"
     },
     "api": {
-      "root": "api/",
+      "root": "./",
       "framework": "fastify",
-      "entrypoint": "src/server.js",
-      "installCommand": "npm install --prefix ..",
+      "entrypoint": "api/src/server.js",
       "routes": [
         {
           "src": "/api/(.*)",
